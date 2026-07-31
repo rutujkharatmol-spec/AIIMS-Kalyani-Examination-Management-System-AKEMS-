@@ -1,1 +1,4 @@
-{}
+{
+  "/(dashboard)/offline-generator/page": "app/(dashboard)/offline-generator/page.js",
+  "/(dashboard)/offline-generator/question-paper/page": "app/(dashboard)/offline-generator/question-paper/page.js"
+}
