@@ -1,0 +1,108 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --primary-glow: conic-gradient(from 180deg at 50% 50%, #2a8af611 0deg, #2a8af611 180deg, #0d948811 360deg);
+  --background-start: #f8fafc; /* slate-50 */
+  --background-end: #f1f5f9; /* slate-100 */
+  --glass-border: rgba(0, 0, 0, 0.05);
+  --glass-bg: rgba(255, 255, 255, 0.8);
+}
+
+body {
+  color: #0f172a; /* slate-900 */
+  background: linear-gradient(135deg, var(--background-start), var(--background-end));
+  background-attachment: fixed;
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-white border border-slate-200 shadow-sm rounded-2xl;
+  }
+  
+  .glass-panel {
+    @apply bg-white/90 backdrop-blur-md border border-slate-200 shadow-md rounded-2xl;
+  }
+  
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-teal-500;
+  }
+  
+  .animate-fade-in-up {
+    animation: fadeInUp 0.5s ease-out forwards;
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  
+  .stagger-1 { animation-delay: 100ms; }
+  .stagger-2 { animation-delay: 200ms; }
+  .stagger-3 { animation-delay: 300ms; }
+  .stagger-4 { animation-delay: 400ms; }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --- Global Dark Mode Overrides (Quick Implementation) --- */
+.dark {
+  --background-start: #0f172a; /* slate-900 */
+  --background-end: #1e293b; /* slate-800 */
+}
+
+.dark body {
+  color: #f1f5f9 !important; /* slate-100 */
+}
+
+.dark .glass, .dark .glass-panel {
+  background-color: rgba(30, 41, 59, 0.9) !important;
+  border-color: #334155 !important;
+}
+
+.dark .bg-white, .dark .bg-slate-50, .dark .bg-slate-100 {
+  background-color: #1e293b !important;
+}
+
+.dark .border-slate-200, .dark .border-slate-100, .dark .border-slate-300 {
+  border-color: #334155 !important;
+}
+
+/* Text color overrides for light theme defaults */
+.dark .text-slate-900, .dark .text-slate-800, .dark .text-slate-700, .dark .text-slate-600 {
+  color: #f1f5f9 !important;
+}
+
+.dark .text-slate-500, .dark .text-slate-400 {
+  color: #94a3b8 !important;
+}
+
+/* Specific elements */
+.dark input {
+  background-color: #0f172a !important;
+  color: #f1f5f9 !important;
+  border-color: #334155 !important;
+}
+
+.dark input::placeholder {
+  color: #64748b !important;
+}
+
+.dark th {
+  background-color: #0f172a !important;
+  color: #e2e8f0 !important;
+}
+
+/* Preserve specific colors from being overridden */
+.dark .text-emerald-500 { color: #10b981 !important; }
+.dark .text-rose-500 { color: #f43f5e !important; }
+.dark .text-blue-500 { color: #3b82f6 !important; }
+.dark .text-amber-500 { color: #f59e0b !important; }
+.dark .text-white { color: #ffffff !important; }
