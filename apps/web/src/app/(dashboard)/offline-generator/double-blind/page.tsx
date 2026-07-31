@@ -38,7 +38,7 @@ export default function DoubleBlindPage() {
         const wb = XLSX.read(bstr, { type: 'binary' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws);
+        const data = XLSX.utils.sheet_to_json(ws) as any[];
         
         if (type === 'students') {
           if (data.length === 0 || (!('Roll No' in data[0]) && !('Roll Number' in data[0]) && !('RollNo' in data[0]))) {
