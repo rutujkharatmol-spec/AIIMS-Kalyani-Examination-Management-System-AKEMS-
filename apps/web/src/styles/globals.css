@@ -106,3 +106,112 @@ body {
 .dark .text-blue-500 { color: #3b82f6 !important; }
 .dark .text-amber-500 { color: #f59e0b !important; }
 .dark .text-white { color: #ffffff !important; }
+
+/* ========== PRINT STYLES – AIIMS Kalyani Question Paper ========== */
+@media print {
+  @page {
+    size: A4;
+    margin: 15mm 18mm;
+  }
+
+  html, body {
+    background: white !important;
+    color: black !important;
+    font-family: 'Times New Roman', Times, serif !important;
+    font-size: 12pt !important;
+    line-height: 1.4 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide everything except the print view */
+  .print\:hidden, .screen-only {
+    display: none !important;
+  }
+
+  .print\:block {
+    display: block !important;
+  }
+
+  /* Page break utilities */
+  .print-page-break {
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .print-avoid-break {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Paper border for question pages */
+  .print-page-border {
+    border: 1.5pt solid black;
+    padding: 20pt 24pt;
+    min-height: calc(100vh - 30mm);
+    box-sizing: border-box;
+  }
+
+  /* Cover page border */
+  .print-cover-border {
+    border: 1.5pt solid black;
+    padding: 24pt 28pt;
+    min-height: calc(100vh - 30mm);
+    box-sizing: border-box;
+  }
+
+  /* Warning box on cover page */
+  .print-warning-box {
+    border: 2pt solid black;
+    padding: 10pt 16pt;
+    margin: 16pt 20pt;
+    text-align: center;
+    font-weight: bold;
+    font-size: 11pt;
+  }
+
+  /* Enrollment box */
+  .print-enrollment-box {
+    border: 1.5pt solid black;
+    display: inline-block;
+    min-width: 120pt;
+    height: 20pt;
+    vertical-align: middle;
+  }
+
+  /* Remove all shadows, backgrounds, animations */
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+    animation: none !important;
+    transition: none !important;
+  }
+
+  /* 2-column layout for Professional MBBS MCQs */
+  .print-two-col {
+    column-count: 2;
+    column-gap: 24pt;
+    column-rule: none;
+  }
+
+  .print-two-col > * {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Ensure logo prints */
+  .print-logo {
+    width: 70pt;
+    height: auto;
+  }
+
+  /* Section underline */
+  .print-section-title {
+    text-align: center;
+    font-weight: bold;
+    text-decoration: underline;
+    font-size: 12pt;
+    margin: 12pt 0;
+  }
+}
+
