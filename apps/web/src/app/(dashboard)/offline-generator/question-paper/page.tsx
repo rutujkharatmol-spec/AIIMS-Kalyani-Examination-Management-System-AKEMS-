@@ -153,7 +153,7 @@ export default function OfflineGeneratorPage() {
             optionC: cIdx !== -1 ? String(row[cIdx] || '') : undefined,
             optionD: dIdx !== -1 ? String(row[dIdx] || '') : undefined,
             correctAnswer: ansIdx !== -1 ? String(row[ansIdx] || '') : undefined,
-            marks: marksIdx !== -1 ? Number(row[marksIdx]) || (qType === 'MCQ' ? 1 : (qType === 'SAQ' ? 5 : 10)),
+            marks: (marksIdx !== -1 && row[marksIdx]) ? Number(row[marksIdx]) : (qType === 'MCQ' ? 1 : (qType === 'SAQ' ? 5 : 10)),
             subject: subjectName,
             type: qType
           });

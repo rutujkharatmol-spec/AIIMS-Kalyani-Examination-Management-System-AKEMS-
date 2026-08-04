@@ -1,4 +1,6 @@
 {
+  "/not-found": "app/not-found.js",
   "/(dashboard)/offline-generator/page": "app/(dashboard)/offline-generator/page.js",
-  "/(dashboard)/offline-generator/question-paper/page": "app/(dashboard)/offline-generator/question-paper/page.js"
+  "/(dashboard)/offline-generator/question-paper/page": "app/(dashboard)/offline-generator/question-paper/page.js",
+  "/(dashboard)/dashboard/page": "app/(dashboard)/dashboard/page.js"
 }

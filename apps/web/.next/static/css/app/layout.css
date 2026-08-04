@@ -626,9 +626,6 @@ video {
 .left-0 {
   left: 0px;
 }
-.left-1 {
-  left: 0.25rem;
-}
 .left-1\/2 {
   left: 50%;
 }
@@ -1262,6 +1259,10 @@ video {
 .border-blue-50 {
   --tw-border-opacity: 1;
   border-color: rgb(239 246 255 / var(--tw-border-opacity, 1));
+}
+.border-blue-500 {
+  --tw-border-opacity: 1;
+  border-color: rgb(59 130 246 / var(--tw-border-opacity, 1));
 }
 .border-cyan-200 {
   --tw-border-opacity: 1;
@@ -1921,6 +1922,10 @@ video {
   --tw-text-opacity: 1;
   color: rgb(37 99 235 / var(--tw-text-opacity, 1));
 }
+.text-blue-700 {
+  --tw-text-opacity: 1;
+  color: rgb(29 78 216 / var(--tw-text-opacity, 1));
+}
 .text-blue-800 {
   --tw-text-opacity: 1;
   color: rgb(30 64 175 / var(--tw-text-opacity, 1));
@@ -2104,6 +2109,9 @@ video {
 .text-white\/70 {
   color: rgb(255 255 255 / 0.7);
 }
+.underline {
+  text-decoration-line: underline;
+}
 .antialiased {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -2160,6 +2168,10 @@ video {
   --tw-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
   --tw-shadow-colored: 0 20px 25px -5px var(--tw-shadow-color), 0 8px 10px -6px var(--tw-shadow-color);
   box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+}
+.shadow-blue-100 {
+  --tw-shadow-color: #dbeafe;
+  --tw-shadow: var(--tw-shadow-colored);
 }
 .shadow-blue-500\/20 {
   --tw-shadow-color: rgb(59 130 246 / 0.2);
@@ -2386,6 +2398,120 @@ body {
 .dark .text-blue-500 { color: #3b82f6 !important; }
 .dark .text-amber-500 { color: #f59e0b !important; }
 .dark .text-white { color: #ffffff !important; }
+
+/* ========== PRINT STYLES – AIIMS Kalyani Question Paper ========== */
+@media print {
+  @page {
+    size: A4;
+    margin: 15mm 18mm;
+  }
+
+  html, body {
+    background: white !important;
+    color: black !important;
+    font-family: 'Times New Roman', Times, serif !important;
+    font-size: 12pt !important;
+    line-height: 1.4 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide everything except the print view */
+  .print\:hidden, .screen-only {
+    display: none !important;
+  }
+
+  .print\:block {
+    display: block !important;
+  }
+
+  /* Page break utilities */
+  .print-page-break {
+    page-break-after: always;
+    -moz-column-break-after: page;
+         break-after: page;
+  }
+
+  .print-avoid-break {
+    page-break-inside: avoid;
+    -moz-column-break-inside: avoid;
+         break-inside: avoid;
+  }
+
+  /* Paper border for question pages */
+  .print-page-border {
+    border: 1.5pt solid black;
+    padding: 20pt 24pt;
+    min-height: calc(100vh - 30mm);
+    box-sizing: border-box;
+  }
+
+  /* Cover page border */
+  .print-cover-border {
+    border: 1.5pt solid black;
+    padding: 24pt 28pt;
+    min-height: calc(100vh - 30mm);
+    box-sizing: border-box;
+  }
+
+  /* Warning box on cover page */
+  .print-warning-box {
+    border: 2pt solid black;
+    padding: 10pt 16pt;
+    margin: 16pt 20pt;
+    text-align: center;
+    font-weight: bold;
+    font-size: 11pt;
+  }
+
+  /* Enrollment box */
+  .print-enrollment-box {
+    border: 1.5pt solid black;
+    display: inline-block;
+    min-width: 120pt;
+    height: 20pt;
+    vertical-align: middle;
+  }
+
+  /* Remove all shadows, backgrounds, animations */
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+    animation: none !important;
+    transition: none !important;
+  }
+
+  /* 2-column layout for Professional MBBS MCQs */
+  .print-two-col {
+    -moz-column-count: 2;
+         column-count: 2;
+    -moz-column-gap: 24pt;
+         column-gap: 24pt;
+    -moz-column-rule: none;
+         column-rule: none;
+  }
+
+  .print-two-col > * {
+    -moz-column-break-inside: avoid;
+         break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Ensure logo prints */
+  .print-logo {
+    width: 70pt;
+    height: auto;
+  }
+
+  /* Section underline */
+  .print-section-title {
+    text-align: center;
+    font-weight: bold;
+    text-decoration: underline;
+    font-size: 12pt;
+    margin: 12pt 0;
+  }
+}
 .last\:border-0:last-child {
   border-width: 0px;
 }
@@ -2433,6 +2559,10 @@ body {
 .hover\:border-purple-300:hover {
   --tw-border-opacity: 1;
   border-color: rgb(216 180 254 / var(--tw-border-opacity, 1));
+}
+.hover\:border-slate-300:hover {
+  --tw-border-opacity: 1;
+  border-color: rgb(203 213 225 / var(--tw-border-opacity, 1));
 }
 .hover\:border-slate-400:hover {
   --tw-border-opacity: 1;
@@ -2832,4 +2962,5 @@ body {
     padding: 0px;
   }
 }
+
 
