@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { LayoutDashboard, Users, Settings, LogOut, ShieldCheck, CalendarDays, FileSpreadsheet, Grid2X2 } from 'lucide-react';
+import { LayoutDashboard, Users, Settings, LogOut, ShieldCheck, CalendarDays, FileSpreadsheet, Grid2X2, GraduationCap } from 'lucide-react';
 import { useOffline } from '../../context/OfflineContext';
 
 export function Sidebar() {
@@ -26,6 +26,10 @@ export function Sidebar() {
             <Link href="/students" className="flex items-center gap-3 p-3 rounded-xl text-slate-600 hover:bg-blue-50 hover:text-blue-700 transition-all duration-300">
               <Users size={20} />
               Students
+            </Link>
+            <Link href="/faculty" className="flex items-center gap-3 p-3 rounded-xl text-slate-600 hover:bg-blue-50 hover:text-blue-700 transition-all duration-300">
+              <GraduationCap size={20} />
+              Faculty
             </Link>
             <Link href="/exam-cycles" className="flex items-center gap-3 p-3 rounded-xl text-slate-600 hover:bg-blue-50 hover:text-blue-700 transition-all duration-300">
               <CalendarDays size={20} className="text-blue-600" />

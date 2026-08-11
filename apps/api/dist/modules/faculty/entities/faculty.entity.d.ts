@@ -1,9 +1,10 @@
 export declare class FacultyProfile {
     id: string;
-    user_id: string;
     employee_id: string;
-    department_id: string;
+    name: string;
+    email: string;
+    department: string;
     designation: string;
-    is_available_for_exam: boolean;
+    status: string;
     created_at: Date;
 }

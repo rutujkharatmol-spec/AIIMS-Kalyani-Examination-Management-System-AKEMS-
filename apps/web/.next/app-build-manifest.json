@@ -11,30 +11,40 @@
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
     ],
-    "/(dashboard)/layout": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/layout.js"
-    ],
     "/(dashboard)/dashboard/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/(dashboard)/dashboard/page.js"
     ],
-    "/(dashboard)/offline-generator/page": [
+    "/(dashboard)/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/offline-generator/page.js"
+      "static/chunks/app/(dashboard)/layout.js"
     ],
-    "/(dashboard)/offline-generator/question-paper/page": [
+    "/(dashboard)/faculty/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/offline-generator/question-paper/page.js"
+      "static/chunks/app/(dashboard)/faculty/page.js"
     ],
-    "/not-found": [
+    "/(dashboard)/students/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/not-found.js"
+      "static/chunks/app/(dashboard)/students/page.js"
+    ],
+    "/(dashboard)/seating/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/seating/page.js"
+    ],
+    "/(dashboard)/exam-cycles/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/exam-cycles/page.js"
+    ],
+    "/(dashboard)/dashboard/settings/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/dashboard/settings/page.js"
     ]
   }
 }

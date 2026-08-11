@@ -1,52 +1,209 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Users, Search, Plus, Filter, Edit, Trash2 } from 'lucide-react';
+import { Users, Search, Plus, Filter, Edit, Trash2, X } from 'lucide-react';
 
 export default function StudentsPage() {
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchStudents = async () => {
-      try {
-        const token = localStorage.getItem('akems_token');
-        if (!token) {
-          console.error('No token found, redirecting to login');
-          window.location.href = '/login';
-          return;
-        }
+  // Add Student Modal State
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isAdding, setIsAdding] = useState(false);
+  
+  // Edit & Delete State
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<any>(null);
+  const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
 
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
-        
-        const res = await fetch(`${apiUrl}/students`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
+  // Search and Filter State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false);
+  const [filterCourse, setFilterCourse] = useState('All');
+  const [filterSemester, setFilterSemester] = useState('All');
 
-        if (res.status === 401) {
-          console.error('Unauthorized, token may be invalid or expired');
-          localStorage.removeItem('akems_token');
-          window.location.href = '/login';
-          return;
-        }
+  const [newStudent, setNewStudent] = useState({
+    roll_number: '',
+    name: '',
+    email: '',
+    course: '',
+    semester: 1,
+    status: 'ACTIVE'
+  });
 
-        const result = await res.json();
-        if (result.success) {
-          setStudents(result.data);
-        } else {
-          console.error('API Error:', result);
-        }
-      } catch (error) {
-        console.error('Failed to fetch students:', error);
-      } finally {
-        setLoading(false);
+  const fetchStudents = async () => {
+    try {
+      const token = localStorage.getItem('akems_token');
+      if (!token) {
+        console.error('No token found, redirecting to login');
+        window.location.href = '/login';
+        return;
       }
-    };
 
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+      
+      const res = await fetch(`${apiUrl}/students`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (res.status === 401) {
+        console.error('Unauthorized, token may be invalid or expired');
+        localStorage.removeItem('akems_token');
+        window.location.href = '/login';
+        return;
+      }
+
+      const result = await res.json();
+      if (result.success) {
+        setStudents(result.data);
+      } else {
+        console.error('API Error:', result);
+      }
+    } catch (error) {
+      console.error('Failed to fetch students:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchStudents();
   }, []);
+
+  const handleAddStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsAdding(true);
+    try {
+      const token = localStorage.getItem('akems_token');
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+      
+      const payload = {
+        ...newStudent,
+        semester: Number(newStudent.semester)
+      };
+
+      const res = await fetch(`${apiUrl}/students`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        setIsAddModalOpen(false);
+        setNewStudent({
+          roll_number: '',
+          name: '',
+          email: '',
+          course: '',
+          semester: 1,
+          status: 'ACTIVE'
+        });
+        fetchStudents();
+      } else {
+        const errorData = await res.json();
+        alert(`Failed to add student. ${errorData.message || 'Please try again.'}`);
+      }
+    } catch (error) {
+      console.error(error);
+      alert('An error occurred.');
+    } finally {
+      setIsAdding(false);
+    }
+  };
+
+  const handleDeleteStudent = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this student profile?')) return;
+    
+    setIsDeletingId(id);
+    try {
+      const token = localStorage.getItem('akems_token');
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+      
+      const res = await fetch(`${apiUrl}/students/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (res.ok) {
+        fetchStudents();
+      } else {
+        alert('Failed to delete student.');
+      }
+    } catch (error) {
+      console.error(error);
+      alert('An error occurred.');
+    } finally {
+      setIsDeletingId(null);
+    }
+  };
+
+  const openEditModal = (student: any) => {
+    setEditingStudent({
+      id: student.id,
+      roll_number: student.roll_number,
+      name: student.name,
+      email: student.email,
+      course: student.course,
+      semester: student.semester,
+      status: student.status
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const handleUpdateStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingStudent) return;
+    
+    setIsAdding(true);
+    try {
+      const token = localStorage.getItem('akems_token');
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+      
+      const payload = {
+        ...editingStudent,
+        semester: Number(editingStudent.semester)
+      };
+
+      const res = await fetch(`${apiUrl}/students/${editingStudent.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        setIsEditModalOpen(false);
+        setEditingStudent(null);
+        fetchStudents();
+      } else {
+        alert('Failed to update student. Please try again.');
+      }
+    } catch (error) {
+      console.error(error);
+      alert('An error occurred.');
+    } finally {
+      setIsAdding(false);
+    }
+  };
+
+  const filteredStudents = students.filter(student => {
+    const matchesSearch = 
+      student.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      student.roll_number.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      student.email.toLowerCase().includes(searchQuery.toLowerCase());
+      
+    const matchesCourse = filterCourse === 'All' || student.course === filterCourse;
+    const matchesSemester = filterSemester === 'All' || student.semester.toString() === filterSemester;
+    
+    return matchesSearch && matchesCourse && matchesSemester;
+  });
 
   return (
     <div className="space-y-6 animate-fade-in-up">
@@ -58,7 +215,10 @@ export default function StudentsPage() {
           </h1>
           <p className="text-slate-500 mt-1">Manage student profiles, enrollments, and academic status.</p>
         </div>
-        <button className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-5 rounded-xl transition-all shadow-md shadow-blue-500/20 flex items-center gap-2 hover:-translate-y-0.5">
+        <button 
+          onClick={() => setIsAddModalOpen(true)}
+          className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-5 rounded-xl transition-all shadow-md shadow-blue-500/20 flex items-center gap-2 hover:-translate-y-0.5"
+        >
           <Plus size={18} />
           Add Student
         </button>
@@ -74,12 +234,55 @@ export default function StudentsPage() {
               type="text" 
               className="w-full bg-white border border-slate-300 rounded-xl py-2.5 pl-10 pr-4 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/50 transition-all shadow-sm"
               placeholder="Search by name, roll number, or email..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <button className="w-full md:w-auto bg-slate-50 border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-bold py-2.5 px-4 rounded-xl transition-all flex items-center justify-center gap-2">
-            <Filter size={18} />
-            Filters
-          </button>
+          <div className="relative w-full md:w-auto">
+            <button 
+              onClick={() => setIsFiltersOpen(!isFiltersOpen)}
+              className="w-full md:w-auto bg-slate-50 border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-bold py-2.5 px-4 rounded-xl transition-all flex items-center justify-center gap-2"
+            >
+              <Filter size={18} />
+              Filters
+            </button>
+            {isFiltersOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setIsFiltersOpen(false)} />
+                <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-100 p-4 z-20 animate-fade-in">
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Course</label>
+                      <select 
+                        className="w-full border border-slate-200 bg-white text-slate-900 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                        value={filterCourse}
+                        onChange={(e) => setFilterCourse(e.target.value)}
+                      >
+                        <option value="All">All Courses</option>
+                        <option value="MBBS">MBBS</option>
+                        <option value="B.Sc Nursing">B.Sc Nursing</option>
+                        <option value="MD General Medicine">MD General Medicine</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Semester</label>
+                      <select 
+                        className="w-full border border-slate-200 bg-white text-slate-900 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                        value={filterSemester}
+                        onChange={(e) => setFilterSemester(e.target.value)}
+                      >
+                        <option value="All">All Semesters</option>
+                        <option value="1">Semester 1</option>
+                        <option value="2">Semester 2</option>
+                        <option value="3">Semester 3</option>
+                        <option value="4">Semester 4</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -99,12 +302,12 @@ export default function StudentsPage() {
                 <tr>
                   <td colSpan={6} className="py-8 text-center text-slate-400">Loading student data...</td>
                 </tr>
-              ) : students.length === 0 ? (
+              ) : filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-slate-400">No students found.</td>
+                  <td colSpan={6} className="py-8 text-center text-slate-400">No students found matching your filters.</td>
                 </tr>
               ) : (
-                students.map((student, idx) => (
+                filteredStudents.map((student, idx) => (
                   <tr key={student.id} className="group hover:bg-slate-50 transition-colors">
                     <td className="py-4 px-4 whitespace-nowrap text-sm font-bold text-slate-700 group-hover:text-blue-600 transition-colors">
                       {student.roll_number}
@@ -136,11 +339,24 @@ export default function StudentsPage() {
                     </td>
                     <td className="py-4 px-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 rounded-lg transition-colors" title="Edit">
+                        <button 
+                          onClick={() => openEditModal(student)}
+                          className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 rounded-lg transition-colors" 
+                          title="Edit"
+                        >
                           <Edit size={16} />
                         </button>
-                        <button className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 rounded-lg transition-colors" title="Delete">
-                          <Trash2 size={16} />
+                        <button 
+                          onClick={() => handleDeleteStudent(student.id)}
+                          disabled={isDeletingId === student.id}
+                          className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-600 hover:text-rose-700 rounded-lg transition-colors disabled:opacity-50" 
+                          title="Delete"
+                        >
+                          {isDeletingId === student.id ? (
+                             <div className="w-4 h-4 border-2 border-rose-600/30 border-t-rose-600 rounded-full animate-spin"></div>
+                          ) : (
+                            <Trash2 size={16} />
+                          )}
                         </button>
                       </div>
                     </td>
@@ -151,6 +367,239 @@ export default function StudentsPage() {
           </table>
         </div>
       </div>
+
+      {/* Add Student Modal */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-slide-up">
+            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <h3 className="font-bold text-lg text-slate-800">Add New Student</h3>
+              <button 
+                onClick={() => setIsAddModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-full hover:bg-slate-200"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <form onSubmit={handleAddStudent} className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Roll Number</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="MBBS24001"
+                    className="w-full border border-slate-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-900"
+                    value={newStudent.roll_number}
+                    onChange={e => setNewStudent({...newStudent, roll_number: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Full Name</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Aarav Patel"
+                    className="w-full border border-slate-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-900"
+                    value={newStudent.name}
+                    onChange={e => setNewStudent({...newStudent, name: e.target.value})}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Email Address</label>
+                <input
+                  type="email"
+                  required
+                  placeholder="aarav@aiimskalyani.edu.in"
+                  className="w-full border border-slate-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-900"
+                  value={newStudent.email}
+                  onChange={e => setNewStudent({...newStudent, email: e.target.value})}
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Course</label>
+                  <select
+                    className="w-full border border-slate-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-900"
+                    value={newStudent.course}
+                    onChange={e => setNewStudent({...newStudent, course: e.target.value})}
+                    required
+                  >
+                    <option value="" disabled>Select Course</option>
+                    <option value="MBBS">MBBS</option>
+                    <option value="B.Sc Nursing">B.Sc Nursing</option>
+                    <option value="MD General Medicine">MD General Medicine</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Semester</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    required
+                    className="w-full border border-slate-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-900"
+                    value={newStudent.semester}
+                    onChange={e => setNewStudent({...newStudent, semester: parseInt(e.target.value) || 1})}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Status</label>
+                <select
+                  className="w-full border border-slate-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-900"
+                  value={newStudent.status}
+                  onChange={e => setNewStudent({...newStudent, status: e.target.value})}
+                >
+                  <option value="ACTIVE">Active</option>
+                  <option value="INACTIVE">Inactive</option>
+                </select>
+              </div>
+
+              <div className="pt-4 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsAddModalOpen(false)}
+                  className="flex-1 px-4 py-2.5 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isAdding}
+                  className="flex-1 px-4 py-2.5 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-md shadow-blue-500/20 disabled:opacity-70 flex items-center justify-center"
+                >
+                  {isAdding ? (
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  ) : (
+                    'Add Student'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Student Modal */}
+      {isEditModalOpen && editingStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-slide-up">
+            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <h3 className="font-bold text-lg text-slate-800">Edit Student</h3>
+              <button 
+                onClick={() => setIsEditModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-full hover:bg-slate-200"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <form onSubmit={handleUpdateStudent} className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Roll Number</label>
+                  <input
+                    type="text"
+                    required
+                    className="w-full border border-slate-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-900"
+                    value={editingStudent.roll_number}
+                    onChange={e => setEditingStudent({...editingStudent, roll_number: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Full Name</label>
+                  <input
+                    type="text"
+                    required
+                    className="w-full border border-slate-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-900"
+                    value={editingStudent.name}
+                    onChange={e => setEditingStudent({...editingStudent, name: e.target.value})}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Email Address</label>
+                <input
+                  type="email"
+                  required
+                  className="w-full border border-slate-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-900"
+                  value={editingStudent.email}
+                  onChange={e => setEditingStudent({...editingStudent, email: e.target.value})}
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Course</label>
+                  <select
+                    className="w-full border border-slate-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-900"
+                    value={editingStudent.course}
+                    onChange={e => setEditingStudent({...editingStudent, course: e.target.value})}
+                    required
+                  >
+                    <option value="" disabled>Select Course</option>
+                    <option value="MBBS">MBBS</option>
+                    <option value="B.Sc Nursing">B.Sc Nursing</option>
+                    <option value="MD General Medicine">MD General Medicine</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Semester</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    required
+                    className="w-full border border-slate-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-900"
+                    value={editingStudent.semester}
+                    onChange={e => setEditingStudent({...editingStudent, semester: parseInt(e.target.value) || 1})}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Status</label>
+                <select
+                  className="w-full border border-slate-200 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-900"
+                  value={editingStudent.status}
+                  onChange={e => setEditingStudent({...editingStudent, status: e.target.value})}
+                >
+                  <option value="ACTIVE">Active</option>
+                  <option value="INACTIVE">Inactive</option>
+                </select>
+              </div>
+
+              <div className="pt-4 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="flex-1 px-4 py-2.5 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isAdding}
+                  className="flex-1 px-4 py-2.5 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-md shadow-blue-500/20 disabled:opacity-70 flex items-center justify-center"
+                >
+                  {isAdding ? (
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  ) : (
+                    'Save Changes'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

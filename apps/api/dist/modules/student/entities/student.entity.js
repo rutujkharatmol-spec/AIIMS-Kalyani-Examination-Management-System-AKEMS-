@@ -13,11 +13,11 @@ exports.StudentProfile = void 0;
 const typeorm_1 = require("typeorm");
 let StudentProfile = class StudentProfile {
     id;
-    user_id;
     roll_number;
-    course_id;
-    batch_id;
-    current_semester;
+    name;
+    email;
+    course;
+    semester;
     status;
     created_at;
 };
@@ -27,27 +27,27 @@ __decorate([
     __metadata("design:type", String)
 ], StudentProfile.prototype, "id", void 0);
 __decorate([
-    (0, typeorm_1.Column)('uuid'),
-    __metadata("design:type", String)
-], StudentProfile.prototype, "user_id", void 0);
-__decorate([
     (0, typeorm_1.Column)({ unique: true }),
     __metadata("design:type", String)
 ], StudentProfile.prototype, "roll_number", void 0);
 __decorate([
-    (0, typeorm_1.Column)('uuid'),
+    (0, typeorm_1.Column)({ nullable: true }),
     __metadata("design:type", String)
-], StudentProfile.prototype, "course_id", void 0);
+], StudentProfile.prototype, "name", void 0);
 __decorate([
-    (0, typeorm_1.Column)('uuid'),
+    (0, typeorm_1.Column)({ nullable: true }),
     __metadata("design:type", String)
-], StudentProfile.prototype, "batch_id", void 0);
+], StudentProfile.prototype, "email", void 0);
 __decorate([
-    (0, typeorm_1.Column)('int'),
+    (0, typeorm_1.Column)({ nullable: true }),
+    __metadata("design:type", String)
+], StudentProfile.prototype, "course", void 0);
+__decorate([
+    (0, typeorm_1.Column)('int', { default: 1 }),
     __metadata("design:type", Number)
-], StudentProfile.prototype, "current_semester", void 0);
+], StudentProfile.prototype, "semester", void 0);
 __decorate([
-    (0, typeorm_1.Column)(),
+    (0, typeorm_1.Column)({ default: 'ACTIVE' }),
     __metadata("design:type", String)
 ], StudentProfile.prototype, "status", void 0);
 __decorate([

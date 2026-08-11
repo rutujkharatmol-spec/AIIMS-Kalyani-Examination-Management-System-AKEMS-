@@ -1,6 +1,7 @@
 {
-  "/not-found": "app/not-found.js",
-  "/(dashboard)/offline-generator/page": "app/(dashboard)/offline-generator/page.js",
-  "/(dashboard)/offline-generator/question-paper/page": "app/(dashboard)/offline-generator/question-paper/page.js",
-  "/(dashboard)/dashboard/page": "app/(dashboard)/dashboard/page.js"
+  "/(dashboard)/exam-cycles/page": "app/(dashboard)/exam-cycles/page.js",
+  "/(dashboard)/students/page": "app/(dashboard)/students/page.js",
+  "/(dashboard)/faculty/page": "app/(dashboard)/faculty/page.js",
+  "/(dashboard)/dashboard/page": "app/(dashboard)/dashboard/page.js",
+  "/(dashboard)/dashboard/settings/page": "app/(dashboard)/dashboard/settings/page.js"
 }

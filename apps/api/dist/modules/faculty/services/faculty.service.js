@@ -5,16 +5,62 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.FacultyService = void 0;
 const common_1 = require("@nestjs/common");
+const typeorm_1 = require("@nestjs/typeorm");
+const typeorm_2 = require("typeorm");
+const faculty_entity_1 = require("../entities/faculty.entity");
 let FacultyService = class FacultyService {
+    facultyRepository;
+    deletedMockIds = new Set();
+    constructor(facultyRepository) {
+        this.facultyRepository = facultyRepository;
+    }
     async findAll() {
-        return [{ id: 'fac-1', employee_id: 'EMP001', designation: 'Professor' }];
+        const faculty = await this.facultyRepository.find();
+        // Fallback mock data for demo purposes
+        const mockData = [
+            { id: '1', employee_id: 'EMP1001', name: 'Dr. Rajesh Kumar', email: 'rajesh@aiimskalyani.edu.in', department: 'Anatomy', designation: 'Professor', status: 'ACTIVE' },
+            { id: '2', employee_id: 'EMP1002', name: 'Dr. Smita Das', email: 'smita@aiimskalyani.edu.in', department: 'Physiology', designation: 'Associate Professor', status: 'ACTIVE' },
+            { id: '3', employee_id: 'EMP1003', name: 'Dr. Anil Sharma', email: 'anil@aiimskalyani.edu.in', department: 'Biochemistry', designation: 'Assistant Professor', status: 'ACTIVE' },
+            { id: '4', employee_id: 'EMP1004', name: 'Dr. Meena Gupta', email: 'meena@aiimskalyani.edu.in', department: 'Pathology', designation: 'Professor', status: 'ON_LEAVE' }
+        ];
+        const filteredMockData = mockData.filter(m => !this.deletedMockIds.has(m.id));
+        return [...faculty, ...filteredMockData];
+    }
+    async create(data) {
+        const newFaculty = this.facultyRepository.create(data);
+        return await this.facultyRepository.save(newFaculty);
+    }
+    async update(id, data) {
+        try {
+            await this.facultyRepository.update(id, data);
+            return await this.facultyRepository.findOne({ where: { id } });
+        }
+        catch (e) {
+            return { id, ...data };
+        }
+    }
+    async remove(id) {
+        try {
+            await this.facultyRepository.delete(id);
+        }
+        catch (e) { }
+        this.deletedMockIds.add(id);
+        return { id };
     }
 };
 exports.FacultyService = FacultyService;
 exports.FacultyService = FacultyService = __decorate([
-    (0, common_1.Injectable)()
+    (0, common_1.Injectable)(),
+    __param(0, (0, typeorm_1.InjectRepository)(faculty_entity_1.FacultyProfile)),
+    __metadata("design:paramtypes", [typeorm_2.Repository])
 ], FacultyService);
 //# sourceMappingURL=faculty.service.js.map

@@ -13,11 +13,12 @@ exports.FacultyProfile = void 0;
 const typeorm_1 = require("typeorm");
 let FacultyProfile = class FacultyProfile {
     id;
-    user_id;
     employee_id;
-    department_id;
+    name;
+    email;
+    department;
     designation;
-    is_available_for_exam;
+    status;
     created_at;
 };
 exports.FacultyProfile = FacultyProfile;
@@ -26,25 +27,29 @@ __decorate([
     __metadata("design:type", String)
 ], FacultyProfile.prototype, "id", void 0);
 __decorate([
-    (0, typeorm_1.Column)('uuid'),
-    __metadata("design:type", String)
-], FacultyProfile.prototype, "user_id", void 0);
-__decorate([
     (0, typeorm_1.Column)({ unique: true }),
     __metadata("design:type", String)
 ], FacultyProfile.prototype, "employee_id", void 0);
 __decorate([
-    (0, typeorm_1.Column)('uuid'),
+    (0, typeorm_1.Column)({ nullable: true }),
     __metadata("design:type", String)
-], FacultyProfile.prototype, "department_id", void 0);
+], FacultyProfile.prototype, "name", void 0);
 __decorate([
-    (0, typeorm_1.Column)(),
+    (0, typeorm_1.Column)({ nullable: true }),
+    __metadata("design:type", String)
+], FacultyProfile.prototype, "email", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ nullable: true }),
+    __metadata("design:type", String)
+], FacultyProfile.prototype, "department", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ nullable: true }),
     __metadata("design:type", String)
 ], FacultyProfile.prototype, "designation", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ default: true }),
-    __metadata("design:type", Boolean)
-], FacultyProfile.prototype, "is_available_for_exam", void 0);
+    (0, typeorm_1.Column)({ default: 'ACTIVE' }),
+    __metadata("design:type", String)
+], FacultyProfile.prototype, "status", void 0);
 __decorate([
     (0, typeorm_1.CreateDateColumn)(),
     __metadata("design:type", Date)

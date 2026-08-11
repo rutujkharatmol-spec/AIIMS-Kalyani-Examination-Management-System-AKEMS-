@@ -5,20 +5,23 @@ export class FacultyProfile {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column('uuid')
-  user_id: string;
-
   @Column({ unique: true })
   employee_id: string;
 
-  @Column('uuid')
-  department_id: string;
+  @Column({ nullable: true })
+  name: string;
 
-  @Column()
+  @Column({ nullable: true })
+  email: string;
+
+  @Column({ nullable: true })
+  department: string;
+
+  @Column({ nullable: true })
   designation: string;
 
-  @Column({ default: true })
-  is_available_for_exam: boolean;
+  @Column({ default: 'ACTIVE' })
+  status: string;
 
   @CreateDateColumn()
   created_at: Date;

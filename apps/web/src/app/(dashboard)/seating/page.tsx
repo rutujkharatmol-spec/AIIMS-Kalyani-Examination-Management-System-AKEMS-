@@ -70,16 +70,16 @@ export default function SeatAllocationPage() {
     <div className="space-y-8 animate-fade-in-up">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight flex items-center gap-3">
-            <Grid2X2 className="text-indigo-400" />
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight flex items-center gap-3">
+            <Grid2X2 className="text-indigo-600" />
             Seat Allocation Engine
           </h1>
-          <p className="text-slate-400 mt-1">Automated student distribution across examination rooms.</p>
+          <p className="text-slate-500 mt-1">Automated student distribution across examination rooms.</p>
         </div>
         
         <div className="flex items-center gap-4 w-full md:w-auto">
           <select 
-            className="bg-slate-900 border border-white/10 text-slate-300 text-sm rounded-xl focus:ring-indigo-500 focus:border-indigo-500 block w-full md:w-64 p-2.5 transition-colors"
+            className="bg-white border border-slate-200 text-slate-700 text-sm rounded-xl focus:ring-indigo-500 focus:border-indigo-500 block w-full md:w-64 p-2.5 transition-colors shadow-sm"
             value={selectedCycle}
             onChange={(e) => setSelectedCycle(e.target.value)}
           >
@@ -111,7 +111,7 @@ export default function SeatAllocationPage() {
           {arrangements.map((room) => {
             const percentage = Math.round((room.allocatedCount / room.capacity) * 100);
             return (
-              <div key={room.roomId} className="glass-panel p-6 rounded-3xl border border-white/10 shadow-xl relative overflow-hidden group hover:border-indigo-500/30 transition-all duration-300">
+              <div key={room.roomId} className="glass-panel p-6 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden group hover:border-indigo-500/30 transition-all duration-300">
                 {/* Background Progress Fill */}
                 <div 
                   className="absolute bottom-0 left-0 h-1 bg-indigo-500/50 transition-all duration-1000"
@@ -120,8 +120,8 @@ export default function SeatAllocationPage() {
 
                 <div className="flex justify-between items-start mb-6">
                   <div>
-                    <h3 className="text-xl font-bold text-white tracking-tight">{room.roomNumber}</h3>
-                    <p className="text-sm text-slate-400 mt-1 flex items-center gap-1.5">
+                    <h3 className="text-xl font-bold text-slate-800 tracking-tight">{room.roomNumber}</h3>
+                    <p className="text-sm text-slate-500 mt-1 flex items-center gap-1.5">
                       <Maximize size={14} /> Total Capacity: {room.capacity}
                     </p>
                   </div>
@@ -139,12 +139,12 @@ export default function SeatAllocationPage() {
                   <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Allocated Students (Sample)</h4>
                   <div className="flex flex-wrap gap-2">
                     {room.students.map((student: string, idx: number) => (
-                      <span key={idx} className="px-2.5 py-1 bg-slate-800/50 border border-white/5 rounded-lg text-xs font-medium text-slate-300">
+                      <span key={idx} className="px-2.5 py-1 bg-slate-100 border border-slate-200 rounded-lg text-xs font-medium text-slate-600">
                         {student}
                       </span>
                     ))}
                     {room.allocatedCount > room.students.length && (
-                      <span className="px-2.5 py-1 bg-slate-800/20 border border-dashed border-white/10 rounded-lg text-xs font-medium text-slate-500 flex items-center">
+                      <span className="px-2.5 py-1 bg-slate-50 border border-dashed border-slate-200 rounded-lg text-xs font-medium text-slate-500 flex items-center">
                         + {room.allocatedCount - room.students.length} more
                       </span>
                     )}

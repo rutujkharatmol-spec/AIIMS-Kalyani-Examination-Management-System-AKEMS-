@@ -5,22 +5,22 @@ export class StudentProfile {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column('uuid')
-  user_id: string;
-
   @Column({ unique: true })
   roll_number: string;
 
-  @Column('uuid')
-  course_id: string;
+  @Column({ nullable: true })
+  name: string;
 
-  @Column('uuid')
-  batch_id: string;
+  @Column({ nullable: true })
+  email: string;
 
-  @Column('int')
-  current_semester: number;
+  @Column({ nullable: true })
+  course: string;
 
-  @Column()
+  @Column('int', { default: 1 })
+  semester: number;
+
+  @Column({ default: 'ACTIVE' })
   status: string;
 
   @CreateDateColumn()
