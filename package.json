@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "pnpm --parallel -r dev",
     "build": "pnpm -r build",
+    "start": "pnpm --filter @akems/api start:prod",
     "test": "pnpm -r test",
     "lint": "pnpm -r lint"
   },
