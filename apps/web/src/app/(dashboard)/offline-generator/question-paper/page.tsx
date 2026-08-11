@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
-import { UploadCloud, FileText, CheckCircle2, AlertCircle, RefreshCw, Printer, Lock, Trash2, Library, Info, Settings2, GraduationCap, ClipboardList } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { UploadCloud, FileText, CheckCircle2, AlertCircle, RefreshCw, Printer, Lock, Trash2, Library, Info, Settings2, GraduationCap, ClipboardList, Download, Filter, Search, Shuffle, Edit3, GripVertical, ArrowLeftRight, Key, BarChart3, Save, RotateCcw, Check, X, ChevronDown, ChevronUp } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import aiimsLogo from '@/assets/aiims-kalyani-logo.png';
+import { exportToWord } from '@/lib/export-docx';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -18,6 +19,9 @@ interface Question {
   marks?: number;
   subject?: string;
   type?: 'MCQ' | 'SAQ' | 'LAQ';
+  difficulty?: 'Easy' | 'Medium' | 'Hard';
+  topic?: string;
+  selected?: boolean; // for manual selection mode
 }
 
 interface QuestionBank {
@@ -47,6 +51,28 @@ interface PaperConfig {
   sectionCMarks: number;
 }
 
+interface ColumnMapping {
+  question: number;
+  optionA: number;
+  optionB: number;
+  optionC: number;
+  optionD: number;
+  correctAnswer: number;
+  marks: number;
+  type: number;
+  difficulty: number;
+  topic: number;
+}
+
+interface PendingFile {
+  file: File;
+  headers: string[];
+  sampleRows: string[][];
+  mapping: ColumnMapping;
+}
+
+const STORAGE_KEY = 'akems_qpgen_draft';
+
 // ─── Component ────────────────────────────────────────────────────
 
 export default function OfflineGeneratorPage() {
@@ -57,6 +83,31 @@ export default function OfflineGeneratorPage() {
   const [watermark, setWatermark] = useState<string>('CONFIDENTIAL - DO NOT COPY');
   const [password, setPassword] = useState<string>('');
   const [generatedPaper, setGeneratedPaper] = useState<Question[] | null>(null);
+
+  // Selection & filter state
+  const [selectionMode, setSelectionMode] = useState<'random' | 'manual'>('random');
+  const [filterType, setFilterType] = useState<string>('all');
+  const [filterDifficulty, setFilterDifficulty] = useState<string>('all');
+  const [filterTopic, setFilterTopic] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [expandedBankId, setExpandedBankId] = useState<string | null>(null);
+
+  // Inline editing state
+  const [editingQuestion, setEditingQuestion] = useState<{ idx: number; field: string } | null>(null);
+  const [editValue, setEditValue] = useState('');
+
+  // Drag-and-drop state
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+
+  // Column mapping state
+  const [pendingFile, setPendingFile] = useState<PendingFile | null>(null);
+
+  // Draft restore state
+  const [showRestorePrompt, setShowRestorePrompt] = useState(false);
+
+  // Answer key print state
+  const [printAnswerKey, setPrintAnswerKey] = useState(false);
 
   const [config, setConfig] = useState<PaperConfig>({
     paperType: 'final-exam',
@@ -76,11 +127,82 @@ export default function OfflineGeneratorPage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // ─── Draft Persistence ──────────────────────────────────────────
+
+  // Auto-save to localStorage
   useEffect(() => {
-    if (!XLSX) {
-      console.error("XLSX library failed to load");
+    if (uploadedBanks.length === 0 && !generatedPaper) return;
+    const draft = {
+      config,
+      uploadedBanks,
+      generatedPaper,
+      watermark,
+      selectionMode,
+      timestamp: new Date().toISOString(),
+    };
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+    } catch (e) {
+      // localStorage full or unavailable – silently ignore
+    }
+  }, [config, uploadedBanks, generatedPaper, watermark, selectionMode]);
+
+  // Check for saved draft on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const draft = JSON.parse(saved);
+        if (draft.uploadedBanks?.length > 0 || draft.generatedPaper) {
+          setShowRestorePrompt(true);
+        }
+      }
+    } catch (e) {
+      // Corrupted data – ignore
     }
   }, []);
+
+  const restoreDraft = () => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const draft = JSON.parse(saved);
+        if (draft.config) setConfig(draft.config);
+        if (draft.uploadedBanks) setUploadedBanks(draft.uploadedBanks);
+        if (draft.generatedPaper) setGeneratedPaper(draft.generatedPaper);
+        if (draft.watermark) setWatermark(draft.watermark);
+        if (draft.selectionMode) setSelectionMode(draft.selectionMode);
+      }
+    } catch (e) {
+      setError('Failed to restore draft.');
+    }
+    setShowRestorePrompt(false);
+  };
+
+  const discardDraft = () => {
+    localStorage.removeItem(STORAGE_KEY);
+    setShowRestorePrompt(false);
+  };
+
+  // ─── Download Template ──────────────────────────────────────────
+
+  const downloadTemplate = () => {
+    const templateData = [
+      ['Question', 'Type', 'Option A', 'Option B', 'Option C', 'Option D', 'Correct Answer', 'Marks', 'Difficulty', 'Topic'],
+      ['What is the capital of India?', 'MCQ', 'Mumbai', 'Delhi', 'Kolkata', 'Chennai', 'B', 1, 'Easy', 'General Knowledge'],
+      ['Describe the structure of DNA.', 'SAQ', '', '', '', '', '', 5, 'Medium', 'Biochemistry'],
+      ['Explain the pathophysiology of diabetes mellitus.', 'LAQ', '', '', '', '', '', 10, 'Hard', 'Medicine'],
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(templateData);
+    // Set column widths
+    ws['!cols'] = [
+      { wch: 50 }, { wch: 8 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 14 }, { wch: 8 }, { wch: 12 }, { wch: 20 },
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Questions');
+    XLSX.writeFile(wb, 'AKEMS_Question_Bank_Template.xlsx');
+  };
 
   // ─── File Upload ──────────────────────────────────────────────
 
@@ -99,13 +221,29 @@ export default function OfflineGeneratorPage() {
     processFiles(validFiles);
   };
 
+  // ─── Auto-detect columns helper ─────────────────────────────
+
+  const autoDetectMapping = (headers: string[]): ColumnMapping => {
+    const h = headers.map(hh => String(hh).toLowerCase().trim());
+    return {
+      question: h.findIndex(x => x.includes('question') && !x.includes('type')),
+      optionA: h.findIndex(x => x.includes('option a') || x === 'a'),
+      optionB: h.findIndex(x => x.includes('option b') || x === 'b'),
+      optionC: h.findIndex(x => x.includes('option c') || x === 'c'),
+      optionD: h.findIndex(x => x.includes('option d') || x === 'd'),
+      correctAnswer: h.findIndex(x => x.includes('correct') || x.includes('answer')),
+      marks: h.findIndex(x => x.includes('mark')),
+      type: h.findIndex(x => x.includes('type')),
+      difficulty: h.findIndex(x => x.includes('difficult') || x.includes('level')),
+      topic: h.findIndex(x => x.includes('topic') || x.includes('chapter') || x.includes('subject')),
+    };
+  };
+
   const processFiles = async (files: File[]) => {
     setIsProcessing(true);
     setError(null);
 
     try {
-      const newBanks: QuestionBank[] = [];
-
       for (const file of files) {
         const data = await file.arrayBuffer();
         const workbook = XLSX.read(data);
@@ -116,72 +254,108 @@ export default function OfflineGeneratorPage() {
 
         if (jsonData.length < 2) continue;
 
-        const headers = jsonData[0].map(h => String(h).toLowerCase().trim());
-        const qIdx = headers.findIndex(h => h.includes('question') && !h.includes('type'));
-        const aIdx = headers.findIndex(h => h.includes('option a') || h === 'a');
-        const bIdx = headers.findIndex(h => h.includes('option b') || h === 'b');
-        const cIdx = headers.findIndex(h => h.includes('option c') || h === 'c');
-        const dIdx = headers.findIndex(h => h.includes('option d') || h === 'd');
-        const ansIdx = headers.findIndex(h => h.includes('correct') || h.includes('answer'));
-        const marksIdx = headers.findIndex(h => h.includes('mark'));
-        const typeIdx = headers.findIndex(h => h.includes('type'));
+        const headers = jsonData[0].map(h => String(h || ''));
+        const mapping = autoDetectMapping(headers);
 
-        if (qIdx === -1) {
-          throw new Error(`File ${file.name} is missing a 'Question' column.`);
+        // If we can't detect the question column, show mapping UI
+        if (mapping.question === -1) {
+          const sampleRows = jsonData.slice(1, 4).map(row => row.map(cell => String(cell || '')));
+          setPendingFile({ file, headers, sampleRows, mapping });
+          setIsProcessing(false);
+          return;
         }
 
-        const parsedQuestions: Question[] = [];
-        const subjectName = file.name.replace(/\.[^/.]+$/, "");
-
-        for (let i = 1; i < jsonData.length; i++) {
-          const row = jsonData[i];
-          if (!row || !row[qIdx]) continue;
-          
-          let qType: 'MCQ' | 'SAQ' | 'LAQ' = 'MCQ';
-          if (typeIdx !== -1 && row[typeIdx]) {
-            const t = String(row[typeIdx]).trim().toUpperCase();
-            if (t === 'SAQ' || t === 'LAQ') {
-              qType = t;
-            }
-          }
-
-          parsedQuestions.push({
-            id: `Q${i}_${Math.random().toString(36).substr(2, 5)}`,
-            question: String(row[qIdx] || ''),
-            optionA: aIdx !== -1 ? String(row[aIdx] || '') : undefined,
-            optionB: bIdx !== -1 ? String(row[bIdx] || '') : undefined,
-            optionC: cIdx !== -1 ? String(row[cIdx] || '') : undefined,
-            optionD: dIdx !== -1 ? String(row[dIdx] || '') : undefined,
-            correctAnswer: ansIdx !== -1 ? String(row[ansIdx] || '') : undefined,
-            marks: (marksIdx !== -1 && row[marksIdx]) ? Number(row[marksIdx]) : (qType === 'MCQ' ? 1 : (qType === 'SAQ' ? 5 : 10)),
-            subject: subjectName,
-            type: qType
-          });
-        }
-
-        if (parsedQuestions.length > 0) {
-          const mcqCount = parsedQuestions.filter(q => q.type === 'MCQ').length;
-          const saqCount = parsedQuestions.filter(q => q.type === 'SAQ').length;
-          const laqCount = parsedQuestions.filter(q => q.type === 'LAQ').length;
-
-          newBanks.push({
-            id: Math.random().toString(36).substr(2, 9),
-            filename: file.name,
-            questions: parsedQuestions,
-            targetMCQ: Math.min(10, mcqCount),
-            targetSAQ: Math.min(2, saqCount),
-            targetLAQ: Math.min(1, laqCount)
-          });
-        }
+        // Process with detected mapping
+        processWithMapping(file, jsonData, mapping);
       }
-
-      setUploadedBanks(prev => [...prev, ...newBanks]);
     } catch (err: any) {
       setError(err.message || "Failed to process files.");
     } finally {
       setIsProcessing(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
+  };
+
+  const processWithMapping = (file: File, jsonData: any[][], mapping: ColumnMapping) => {
+    const parsedQuestions: Question[] = [];
+    const subjectName = file.name.replace(/\.[^/.]+$/, "");
+
+    for (let i = 1; i < jsonData.length; i++) {
+      const row = jsonData[i];
+      if (!row || (mapping.question !== -1 && !row[mapping.question])) continue;
+
+      let qType: 'MCQ' | 'SAQ' | 'LAQ' = 'MCQ';
+      if (mapping.type !== -1 && row[mapping.type]) {
+        const t = String(row[mapping.type]).trim().toUpperCase();
+        if (t === 'SAQ' || t === 'LAQ') {
+          qType = t;
+        }
+      }
+
+      let difficulty: 'Easy' | 'Medium' | 'Hard' | undefined;
+      if (mapping.difficulty !== -1 && row[mapping.difficulty]) {
+        const d = String(row[mapping.difficulty]).trim().toLowerCase();
+        if (d.startsWith('easy') || d === 'e') difficulty = 'Easy';
+        else if (d.startsWith('medium') || d === 'm') difficulty = 'Medium';
+        else if (d.startsWith('hard') || d === 'h') difficulty = 'Hard';
+      }
+
+      parsedQuestions.push({
+        id: `Q${i}_${Math.random().toString(36).substr(2, 5)}`,
+        question: mapping.question !== -1 ? String(row[mapping.question] || '') : '',
+        optionA: mapping.optionA !== -1 ? String(row[mapping.optionA] || '') : undefined,
+        optionB: mapping.optionB !== -1 ? String(row[mapping.optionB] || '') : undefined,
+        optionC: mapping.optionC !== -1 ? String(row[mapping.optionC] || '') : undefined,
+        optionD: mapping.optionD !== -1 ? String(row[mapping.optionD] || '') : undefined,
+        correctAnswer: mapping.correctAnswer !== -1 ? String(row[mapping.correctAnswer] || '') : undefined,
+        marks: (mapping.marks !== -1 && row[mapping.marks]) ? Number(row[mapping.marks]) : (qType === 'MCQ' ? 1 : (qType === 'SAQ' ? 5 : 10)),
+        subject: subjectName,
+        type: qType,
+        difficulty,
+        topic: mapping.topic !== -1 ? String(row[mapping.topic] || '') : undefined,
+        selected: true, // default selected for manual mode
+      });
+    }
+
+    if (parsedQuestions.length > 0) {
+      const mcqCount = parsedQuestions.filter(q => q.type === 'MCQ').length;
+      const saqCount = parsedQuestions.filter(q => q.type === 'SAQ').length;
+      const laqCount = parsedQuestions.filter(q => q.type === 'LAQ').length;
+
+      setUploadedBanks(prev => [...prev, {
+        id: Math.random().toString(36).substr(2, 9),
+        filename: file.name,
+        questions: parsedQuestions,
+        targetMCQ: Math.min(10, mcqCount),
+        targetSAQ: Math.min(2, saqCount),
+        targetLAQ: Math.min(1, laqCount)
+      }]);
+    }
+  };
+
+  const confirmMapping = () => {
+    if (!pendingFile) return;
+
+    const { file, headers, mapping } = pendingFile;
+
+    if (mapping.question === -1) {
+      setError('You must map the "Question" column.');
+      return;
+    }
+
+    // Re-read the file and process with user-provided mapping
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const data = e.target?.result;
+      if (!data) return;
+      const workbook = XLSX.read(data);
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
+      processWithMapping(pendingFile.file, jsonData, mapping);
+      setPendingFile(null);
+    };
+    reader.readAsArrayBuffer(file);
   };
 
   const removeBank = (id: string) => {
@@ -202,6 +376,45 @@ export default function OfflineGeneratorPage() {
     }));
   };
 
+  // ─── Toggle question selection (manual mode) ──────────────────
+
+  const toggleQuestionSelection = (bankId: string, questionId: string) => {
+    setUploadedBanks(prev => prev.map(b => {
+      if (b.id !== bankId) return b;
+      return {
+        ...b,
+        questions: b.questions.map(q =>
+          q.id === questionId ? { ...q, selected: !q.selected } : q
+        )
+      };
+    }));
+  };
+
+  const selectAllInBank = (bankId: string, selected: boolean) => {
+    setUploadedBanks(prev => prev.map(b => {
+      if (b.id !== bankId) return b;
+      return {
+        ...b,
+        questions: b.questions.map(q => ({ ...q, selected }))
+      };
+    }));
+  };
+
+  // ─── Filter questions helper ──────────────────────────────────
+
+  const getFilteredQuestions = (questions: Question[]) => {
+    return questions.filter(q => {
+      if (filterType !== 'all' && q.type !== filterType) return false;
+      if (filterDifficulty !== 'all' && q.difficulty !== filterDifficulty) return false;
+      if (filterTopic !== 'all' && q.topic !== filterTopic) return false;
+      if (searchQuery && !q.question.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      return true;
+    });
+  };
+
+  // Get unique topics across all banks
+  const allTopics = Array.from(new Set(uploadedBanks.flatMap(b => b.questions.map(q => q.topic).filter((t): t is string => Boolean(t)))));
+
   // ─── Generate Paper ───────────────────────────────────────────
 
   const generatePaper = () => {
@@ -209,84 +422,272 @@ export default function OfflineGeneratorPage() {
 
     let allSelectedQuestions: Question[] = [];
 
-    uploadedBanks.forEach(bank => {
-      // Group questions by type
-      const mcqs = bank.questions.filter(q => q.type === 'MCQ');
-      const saqs = bank.questions.filter(q => q.type === 'SAQ');
-      const laqs = bank.questions.filter(q => q.type === 'LAQ');
+    if (selectionMode === 'manual') {
+      // In manual mode, just use the selected questions
+      uploadedBanks.forEach(bank => {
+        const selected = bank.questions.filter(q => q.selected);
+        allSelectedQuestions = [...allSelectedQuestions, ...selected];
+      });
+    } else {
+      // Random mode - existing logic
+      uploadedBanks.forEach(bank => {
+        const mcqs = bank.questions.filter(q => q.type === 'MCQ');
+        const saqs = bank.questions.filter(q => q.type === 'SAQ');
+        const laqs = bank.questions.filter(q => q.type === 'LAQ');
 
-      // Helper to process and shuffle a specific type
-      const processQuestions = (questions: Question[], count: number, shuffleOptions: boolean) => {
-        if (count === 0) return [];
-        
-        let processed = [...questions];
+        const processQuestions = (questions: Question[], count: number, shuffleOptions: boolean) => {
+          if (count === 0) return [];
 
-        // Map and shuffle options for MCQs
-        if (shuffleOptions) {
-          processed = processed.map(q => {
-            const options = [
-              { originalKey: 'a', val: q.optionA },
-              { originalKey: 'b', val: q.optionB },
-              { originalKey: 'c', val: q.optionC },
-              { originalKey: 'd', val: q.optionD }
-            ].filter(o => o.val !== undefined && o.val.toString().trim() !== '');
+          let processed = [...questions];
 
-            let originalCorrectKey = '';
-            const ca = q.correctAnswer ? String(q.correctAnswer).trim().toLowerCase() : '';
+          if (shuffleOptions) {
+            processed = processed.map(q => {
+              const options = [
+                { originalKey: 'a', val: q.optionA },
+                { originalKey: 'b', val: q.optionB },
+                { originalKey: 'c', val: q.optionC },
+                { originalKey: 'd', val: q.optionD }
+              ].filter(o => o.val !== undefined && o.val.toString().trim() !== '');
 
-            if (ca === 'a' || ca === 'b' || ca === 'c' || ca === 'd') {
-              originalCorrectKey = ca;
-            } else if (ca) {
-              const matched = options.find(o => o.val?.toString().trim().toLowerCase() === ca);
-              if (matched) originalCorrectKey = matched.originalKey;
-            }
+              let originalCorrectKey = '';
+              const ca = q.correctAnswer ? String(q.correctAnswer).trim().toLowerCase() : '';
 
-            // Fisher-Yates shuffle for options
-            for (let i = options.length - 1; i > 0; i--) {
-              const j = Math.floor(Math.random() * (i + 1));
-              [options[i], options[j]] = [options[j], options[i]];
-            }
-
-            const newQ = { ...q };
-            if (options.length > 0) newQ.optionA = options[0].val; else delete newQ.optionA;
-            if (options.length > 1) newQ.optionB = options[1].val; else delete newQ.optionB;
-            if (options.length > 2) newQ.optionC = options[2].val; else delete newQ.optionC;
-            if (options.length > 3) newQ.optionD = options[3].val; else delete newQ.optionD;
-
-            if (originalCorrectKey) {
-              const newCorrectIndex = options.findIndex(o => o.originalKey === originalCorrectKey);
-              if (newCorrectIndex !== -1) {
-                newQ.correctAnswer = ['A', 'B', 'C', 'D'][newCorrectIndex];
+              if (ca === 'a' || ca === 'b' || ca === 'c' || ca === 'd') {
+                originalCorrectKey = ca;
+              } else if (ca) {
+                const matched = options.find(o => o.val?.toString().trim().toLowerCase() === ca);
+                if (matched) originalCorrectKey = matched.originalKey;
               }
-            }
 
-            return newQ;
-          });
-        }
+              for (let i = options.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [options[i], options[j]] = [options[j], options[i]];
+              }
 
-        // Fisher-Yates shuffle for question order
-        for (let i = processed.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [processed[i], processed[j]] = [processed[j], processed[i]];
-        }
+              const newQ = { ...q };
+              if (options.length > 0) newQ.optionA = options[0].val; else delete newQ.optionA;
+              if (options.length > 1) newQ.optionB = options[1].val; else delete newQ.optionB;
+              if (options.length > 2) newQ.optionC = options[2].val; else delete newQ.optionC;
+              if (options.length > 3) newQ.optionD = options[3].val; else delete newQ.optionD;
 
-        return processed.slice(0, count);
-      };
+              if (originalCorrectKey) {
+                const newCorrectIndex = options.findIndex(o => o.originalKey === originalCorrectKey);
+                if (newCorrectIndex !== -1) {
+                  newQ.correctAnswer = ['A', 'B', 'C', 'D'][newCorrectIndex];
+                }
+              }
 
-      const selectedMCQs = processQuestions(mcqs, bank.targetMCQ, true);
-      const selectedSAQs = processQuestions(saqs, bank.targetSAQ, false);
-      const selectedLAQs = processQuestions(laqs, bank.targetLAQ, false);
+              return newQ;
+            });
+          }
 
-      allSelectedQuestions = [...allSelectedQuestions, ...selectedMCQs, ...selectedSAQs, ...selectedLAQs];
-    });
+          for (let i = processed.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [processed[i], processed[j]] = [processed[j], processed[i]];
+          }
+
+          return processed.slice(0, count);
+        };
+
+        const selectedMCQs = processQuestions(mcqs, bank.targetMCQ, true);
+        const selectedSAQs = processQuestions(saqs, bank.targetSAQ, false);
+        const selectedLAQs = processQuestions(laqs, bank.targetLAQ, false);
+
+        allSelectedQuestions = [...allSelectedQuestions, ...selectedMCQs, ...selectedSAQs, ...selectedLAQs];
+      });
+    }
 
     setGeneratedPaper(allSelectedQuestions);
+  };
+
+  // ─── Inline Editing ──────────────────────────────────────────
+
+  const startEditing = (idx: number, field: string, currentValue: string) => {
+    setEditingQuestion({ idx, field });
+    setEditValue(currentValue);
+  };
+
+  const saveEdit = () => {
+    if (!editingQuestion || !generatedPaper) return;
+    const updated = [...generatedPaper];
+    const q = { ...updated[editingQuestion.idx] };
+    (q as any)[editingQuestion.field] = editValue;
+    updated[editingQuestion.idx] = q;
+    setGeneratedPaper(updated);
+    setEditingQuestion(null);
+    setEditValue('');
+  };
+
+  const cancelEdit = () => {
+    setEditingQuestion(null);
+    setEditValue('');
+  };
+
+  // ─── Drag-and-Drop Reordering ────────────────────────────────
+
+  const handleDragStart = (idx: number) => {
+    setDragIdx(idx);
+  };
+
+  const handleDragOver = (e: React.DragEvent, idx: number) => {
+    e.preventDefault();
+    setDragOverIdx(idx);
+  };
+
+  const handleDrop = (idx: number) => {
+    if (dragIdx === null || !generatedPaper) return;
+    const updated = [...generatedPaper];
+    const [removed] = updated.splice(dragIdx, 1);
+    updated.splice(idx, 0, removed);
+    setGeneratedPaper(updated);
+    setDragIdx(null);
+    setDragOverIdx(null);
+  };
+
+  const handleDragEnd = () => {
+    setDragIdx(null);
+    setDragOverIdx(null);
+  };
+
+  // ─── Swap Question ───────────────────────────────────────────
+
+  const swapQuestion = (idx: number) => {
+    if (!generatedPaper) return;
+    const currentQ = generatedPaper[idx];
+    const currentBank = uploadedBanks.find(b => b.questions.some(q => q.subject === currentQ.subject));
+    if (!currentBank) return;
+
+    const sameTypeQuestions = currentBank.questions.filter(
+      q => q.type === currentQ.type && !generatedPaper.some(gq => gq.id === q.id)
+    );
+
+    if (sameTypeQuestions.length === 0) {
+      setError(`No more ${currentQ.type} questions available in "${currentBank.filename}" to swap with.`);
+      setTimeout(() => setError(null), 3000);
+      return;
+    }
+
+    const randomIdx = Math.floor(Math.random() * sameTypeQuestions.length);
+    const replacement = { ...sameTypeQuestions[randomIdx] };
+
+    const updated = [...generatedPaper];
+    updated[idx] = replacement;
+    setGeneratedPaper(updated);
+  };
+
+  // ─── Shuffle Options for Single Question ───────────────────
+
+  const shuffleOptionsForQuestion = (idx: number) => {
+    if (!generatedPaper) return;
+    const q = generatedPaper[idx];
+    if (q.type !== 'MCQ') return;
+
+    const options = [
+      { key: 'a', val: q.optionA },
+      { key: 'b', val: q.optionB },
+      { key: 'c', val: q.optionC },
+      { key: 'd', val: q.optionD },
+    ].filter(o => o.val !== undefined && o.val.toString().trim() !== '');
+
+    let correctKey = '';
+    const ca = q.correctAnswer ? String(q.correctAnswer).trim().toLowerCase() : '';
+    if (['a', 'b', 'c', 'd'].includes(ca)) {
+      correctKey = ca;
+    } else if (ca) {
+      const matched = options.find(o => o.val?.toString().trim().toLowerCase() === ca);
+      if (matched) correctKey = matched.key;
+    }
+
+    for (let i = options.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [options[i], options[j]] = [options[j], options[i]];
+    }
+
+    const newQ = { ...q };
+    newQ.optionA = options[0]?.val;
+    newQ.optionB = options[1]?.val;
+    newQ.optionC = options[2]?.val;
+    newQ.optionD = options[3]?.val;
+
+    if (correctKey) {
+      const newIdx = options.findIndex(o => o.key === correctKey);
+      if (newIdx !== -1) {
+        newQ.correctAnswer = ['A', 'B', 'C', 'D'][newIdx];
+      }
+    }
+
+    const updated = [...generatedPaper];
+    updated[idx] = newQ;
+    setGeneratedPaper(updated);
+  };
+
+  // ─── Randomize Order ─────────────────────────────────────────
+
+  const randomizeOrder = () => {
+    if (!generatedPaper || generatedPaper.length < 2) return;
+
+    const shuffled = generatedPaper.map(q => {
+      // Shuffle options for MCQs
+      if (q.type === 'MCQ') {
+        const options = [
+          { key: 'a', val: q.optionA },
+          { key: 'b', val: q.optionB },
+          { key: 'c', val: q.optionC },
+          { key: 'd', val: q.optionD },
+        ].filter(o => o.val !== undefined && o.val.toString().trim() !== '');
+
+        // Identify which key is the correct answer
+        let correctKey = '';
+        const ca = q.correctAnswer ? String(q.correctAnswer).trim().toLowerCase() : '';
+        if (['a', 'b', 'c', 'd'].includes(ca)) {
+          correctKey = ca;
+        } else if (ca) {
+          const matched = options.find(o => o.val?.toString().trim().toLowerCase() === ca);
+          if (matched) correctKey = matched.key;
+        }
+
+        // Fisher-Yates shuffle options
+        for (let i = options.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [options[i], options[j]] = [options[j], options[i]];
+        }
+
+        const newQ = { ...q };
+        newQ.optionA = options[0]?.val;
+        newQ.optionB = options[1]?.val;
+        newQ.optionC = options[2]?.val;
+        newQ.optionD = options[3]?.val;
+
+        if (correctKey) {
+          const newIdx = options.findIndex(o => o.key === correctKey);
+          if (newIdx !== -1) {
+            newQ.correctAnswer = ['A', 'B', 'C', 'D'][newIdx];
+          }
+        }
+        return newQ;
+      }
+      return { ...q };
+    });
+
+    // Shuffle question order
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+
+    setGeneratedPaper(shuffled);
   };
 
   // ─── Export Handlers ──────────────────────────────────────────
 
   const handlePrint = () => {
-    window.print();
+    setPrintAnswerKey(false);
+    setTimeout(() => window.print(), 100);
+  };
+
+  const handlePrintAnswerKey = () => {
+    setPrintAnswerKey(true);
+    setTimeout(() => window.print(), 100);
   };
 
   const handleSecureExport = () => {
@@ -324,14 +725,299 @@ export default function OfflineGeneratorPage() {
 
   const totalQuestions = generatedPaper?.length || uploadedBanks.reduce((sum, b) => sum + b.targetMCQ + b.targetSAQ + b.targetLAQ, 0);
 
+  // ─── Editable Text Component ──────────────────────────────────
+
+  const EditableText = ({ value, idx, field, className = '' }: { value: string; idx: number; field: string; className?: string }) => {
+    const isEditing = editingQuestion?.idx === idx && editingQuestion?.field === field;
+
+    if (isEditing) {
+      return (
+        <div className="flex items-center gap-1 w-full">
+          <input
+            type="text"
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') cancelEdit(); }}
+            className="flex-1 bg-white border-2 border-blue-400 rounded px-2 py-1 text-sm text-slate-900 focus:outline-none"
+            autoFocus
+          />
+          <button onClick={saveEdit} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded"><Check size={14} /></button>
+          <button onClick={cancelEdit} className="p-1 text-red-500 hover:bg-red-50 rounded"><X size={14} /></button>
+        </div>
+      );
+    }
+
+    return (
+      <span
+        className={`cursor-pointer hover:bg-blue-50 hover:outline hover:outline-1 hover:outline-blue-300 rounded px-1 -mx-1 transition-colors ${className}`}
+        onClick={() => startEditing(idx, field, value)}
+        title="Click to edit"
+      >
+        {value}
+      </span>
+    );
+  };
+
+  // ═══════════════════════════════════════════════════════════════
+  // COLUMN MAPPING MODAL
+  // ═══════════════════════════════════════════════════════════════
+
+  const renderColumnMappingModal = () => {
+    if (!pendingFile) return null;
+
+    const fieldNames: { key: keyof ColumnMapping; label: string; required: boolean }[] = [
+      { key: 'question', label: 'Question Text', required: true },
+      { key: 'type', label: 'Type (MCQ/SAQ/LAQ)', required: false },
+      { key: 'optionA', label: 'Option A', required: false },
+      { key: 'optionB', label: 'Option B', required: false },
+      { key: 'optionC', label: 'Option C', required: false },
+      { key: 'optionD', label: 'Option D', required: false },
+      { key: 'correctAnswer', label: 'Correct Answer', required: false },
+      { key: 'marks', label: 'Marks', required: false },
+      { key: 'difficulty', label: 'Difficulty', required: false },
+      { key: 'topic', label: 'Topic / Subject', required: false },
+    ];
+
+    return (
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
+              <AlertCircle className="text-amber-600" size={20} />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-slate-900">Column Mapping Required</h3>
+              <p className="text-sm text-slate-500">
+                We couldn&apos;t auto-detect columns in <strong>{pendingFile.file.name}</strong>. Map them manually:
+              </p>
+            </div>
+          </div>
+
+          {/* Sample data preview */}
+          <div className="mb-4 overflow-x-auto">
+            <table className="text-xs border-collapse w-full">
+              <thead>
+                <tr>
+                  {pendingFile.headers.map((h, i) => (
+                    <th key={i} className="bg-slate-100 border border-slate-200 px-2 py-1 font-bold text-slate-700">
+                      Col {i}: {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {pendingFile.sampleRows.map((row, ri) => (
+                  <tr key={ri}>
+                    {row.map((cell, ci) => (
+                      <td key={ci} className="border border-slate-200 px-2 py-1 text-slate-600 max-w-[120px] truncate">{cell}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mapping dropdowns */}
+          <div className="grid grid-cols-2 gap-3 mb-6">
+            {fieldNames.map(({ key, label, required }) => (
+              <div key={key}>
+                <label className="text-xs font-bold text-slate-600 mb-1 block">
+                  {label} {required && <span className="text-red-500">*</span>}
+                </label>
+                <select
+                  value={pendingFile.mapping[key]}
+                  onChange={(e) => {
+                    setPendingFile(prev => prev ? {
+                      ...prev,
+                      mapping: { ...prev.mapping, [key]: parseInt(e.target.value) }
+                    } : null);
+                  }}
+                  className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-blue-500"
+                >
+                  <option value={-1}>— Not mapped —</option>
+                  {pendingFile.headers.map((h, i) => (
+                    <option key={i} value={i}>Col {i}: {h}</option>
+                  ))}
+                </select>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => setPendingFile(null)}
+              className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-sm font-medium transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={confirmMapping}
+              className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold transition-colors shadow-md"
+            >
+              Apply Mapping & Import
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // ═══════════════════════════════════════════════════════════════
   // PRINT LAYOUTS
   // ═══════════════════════════════════════════════════════════════
 
+  // ─── ANSWER KEY Print Layout ──────────────────────────────────
+
+  const renderAnswerKeyPrint = () => {
+    if (!generatedPaper || !printAnswerKey) return null;
+
+    const mcqs = generatedPaper.filter(q => q.type === 'MCQ');
+    const saqs = generatedPaper.filter(q => q.type === 'SAQ');
+    const laqs = generatedPaper.filter(q => q.type === 'LAQ');
+
+    // Blueprint: marks by subject
+    const subjectMap: Record<string, { mcq: number; saq: number; laq: number; total: number }> = {};
+    generatedPaper.forEach(q => {
+      const subj = q.subject || 'Unknown';
+      if (!subjectMap[subj]) subjectMap[subj] = { mcq: 0, saq: 0, laq: 0, total: 0 };
+      const m = q.marks || 0;
+      if (q.type === 'MCQ') subjectMap[subj].mcq += m;
+      else if (q.type === 'SAQ') subjectMap[subj].saq += m;
+      else subjectMap[subj].laq += m;
+      subjectMap[subj].total += m;
+    });
+
+    return (
+      <div className="hidden print:block" style={{ fontFamily: "'Times New Roman', Times, serif", color: 'black' }}>
+
+        {/* ═══ ANSWER KEY ═══ */}
+        <div style={{ textAlign: 'center', marginBottom: '16pt' }}>
+          <img src={aiimsLogo.src} alt="AIIMS Kalyani" className="print-logo" style={{ display: 'inline-block', width: '55pt', height: 'auto' }} />
+        </div>
+        <div style={{ textAlign: 'center', fontSize: '14pt', fontWeight: 'bold', marginBottom: '4pt' }}>
+          All India Institute of Medical Sciences (AIIMS), Kalyani
+        </div>
+        <div style={{ textAlign: 'center', fontSize: '12pt', fontWeight: 'bold', marginBottom: '6pt' }}>
+          ANSWER KEY — {config.paperType === 'final-exam' ? config.examTitle : config.examName}, {config.examMonth}
+        </div>
+        <hr style={{ border: 'none', borderTop: '1.5pt solid black', margin: '8pt 0' }} />
+
+        {/* MCQ Answer Key Grid */}
+        {mcqs.length > 0 && (
+          <div style={{ marginBottom: '20pt' }}>
+            <div style={{ fontSize: '11pt', fontWeight: 'bold', marginBottom: '8pt', textDecoration: 'underline' }}>
+              MCQ Answers:
+            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10pt' }}>
+              <thead>
+                <tr>
+                  <th style={{ border: '1pt solid black', padding: '4pt 8pt', backgroundColor: '#f0f0f0' }}>Q. No.</th>
+                  <th style={{ border: '1pt solid black', padding: '4pt 8pt', backgroundColor: '#f0f0f0' }}>Answer</th>
+                  <th style={{ border: '1pt solid black', padding: '4pt 8pt', backgroundColor: '#f0f0f0' }}>Q. No.</th>
+                  <th style={{ border: '1pt solid black', padding: '4pt 8pt', backgroundColor: '#f0f0f0' }}>Answer</th>
+                  <th style={{ border: '1pt solid black', padding: '4pt 8pt', backgroundColor: '#f0f0f0' }}>Q. No.</th>
+                  <th style={{ border: '1pt solid black', padding: '4pt 8pt', backgroundColor: '#f0f0f0' }}>Answer</th>
+                  <th style={{ border: '1pt solid black', padding: '4pt 8pt', backgroundColor: '#f0f0f0' }}>Q. No.</th>
+                  <th style={{ border: '1pt solid black', padding: '4pt 8pt', backgroundColor: '#f0f0f0' }}>Answer</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Array.from({ length: Math.ceil(mcqs.length / 4) }).map((_, rowIdx) => (
+                  <tr key={rowIdx}>
+                    {[0, 1, 2, 3].map(colIdx => {
+                      const qIdx = rowIdx + colIdx * Math.ceil(mcqs.length / 4);
+                      const q = mcqs[qIdx];
+                      return (
+                        <React.Fragment key={colIdx}>
+                          <td style={{ border: '1pt solid black', padding: '3pt 8pt', textAlign: 'center' }}>
+                            {q ? qIdx + 1 : ''}
+                          </td>
+                          <td style={{ border: '1pt solid black', padding: '3pt 8pt', textAlign: 'center', fontWeight: 'bold' }}>
+                            {q?.correctAnswer || ''}
+                          </td>
+                        </React.Fragment>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* SAQ/LAQ Answers */}
+        {saqs.length > 0 && (
+          <div style={{ marginBottom: '16pt' }}>
+            <div style={{ fontSize: '11pt', fontWeight: 'bold', marginBottom: '6pt', textDecoration: 'underline' }}>SAQ Answers:</div>
+            {saqs.map((q, idx) => (
+              <div key={idx} style={{ fontSize: '10pt', marginBottom: '4pt' }}>
+                <strong>{idx + 1}.</strong> {q.correctAnswer || '(No answer provided)'}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {laqs.length > 0 && (
+          <div style={{ marginBottom: '16pt' }}>
+            <div style={{ fontSize: '11pt', fontWeight: 'bold', marginBottom: '6pt', textDecoration: 'underline' }}>LAQ Answers:</div>
+            {laqs.map((q, idx) => (
+              <div key={idx} style={{ fontSize: '10pt', marginBottom: '4pt' }}>
+                <strong>{idx + 1}.</strong> {q.correctAnswer || '(No answer provided)'}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ═══ EXAM BLUEPRINT ═══ */}
+        <div className="print-page-break" />
+        <div style={{ textAlign: 'center', fontSize: '13pt', fontWeight: 'bold', textDecoration: 'underline', marginBottom: '12pt', marginTop: '20pt' }}>
+          EXAM BLUEPRINT
+        </div>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '10pt' }}>
+          <thead>
+            <tr>
+              <th style={{ border: '1pt solid black', padding: '6pt', backgroundColor: '#f0f0f0' }}>Subject / Bank</th>
+              <th style={{ border: '1pt solid black', padding: '6pt', backgroundColor: '#f0f0f0' }}>MCQ Marks</th>
+              <th style={{ border: '1pt solid black', padding: '6pt', backgroundColor: '#f0f0f0' }}>SAQ Marks</th>
+              <th style={{ border: '1pt solid black', padding: '6pt', backgroundColor: '#f0f0f0' }}>LAQ Marks</th>
+              <th style={{ border: '1pt solid black', padding: '6pt', backgroundColor: '#f0f0f0', fontWeight: 'bold' }}>Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {Object.entries(subjectMap).map(([subj, data]) => (
+              <tr key={subj}>
+                <td style={{ border: '1pt solid black', padding: '4pt 8pt' }}>{subj}</td>
+                <td style={{ border: '1pt solid black', padding: '4pt 8pt', textAlign: 'center' }}>{data.mcq}</td>
+                <td style={{ border: '1pt solid black', padding: '4pt 8pt', textAlign: 'center' }}>{data.saq}</td>
+                <td style={{ border: '1pt solid black', padding: '4pt 8pt', textAlign: 'center' }}>{data.laq}</td>
+                <td style={{ border: '1pt solid black', padding: '4pt 8pt', textAlign: 'center', fontWeight: 'bold' }}>{data.total}</td>
+              </tr>
+            ))}
+            <tr>
+              <td style={{ border: '1pt solid black', padding: '4pt 8pt', fontWeight: 'bold' }}>Grand Total</td>
+              <td style={{ border: '1pt solid black', padding: '4pt 8pt', textAlign: 'center', fontWeight: 'bold' }}>
+                {Object.values(subjectMap).reduce((s, d) => s + d.mcq, 0)}
+              </td>
+              <td style={{ border: '1pt solid black', padding: '4pt 8pt', textAlign: 'center', fontWeight: 'bold' }}>
+                {Object.values(subjectMap).reduce((s, d) => s + d.saq, 0)}
+              </td>
+              <td style={{ border: '1pt solid black', padding: '4pt 8pt', textAlign: 'center', fontWeight: 'bold' }}>
+                {Object.values(subjectMap).reduce((s, d) => s + d.laq, 0)}
+              </td>
+              <td style={{ border: '1pt solid black', padding: '4pt 8pt', textAlign: 'center', fontWeight: 'bold' }}>
+                {Object.values(subjectMap).reduce((s, d) => s + d.total, 0)}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
   // ─── FINAL EXAM (TEST BOOKLET) Print Layout ───────────────────
 
   const renderFinalExamPrint = () => {
-    if (!generatedPaper) return null;
+    if (!generatedPaper || printAnswerKey) return null;
 
     return (
       <div className="hidden print:block" style={{ fontFamily: "'Times New Roman', Times, serif", color: 'black' }}>
@@ -465,7 +1151,7 @@ export default function OfflineGeneratorPage() {
   // ─── PROFESSIONAL MBBS Print Layout ───────────────────────────
 
   const renderProfessionalMbbsPrint = () => {
-    if (!generatedPaper) return null;
+    if (!generatedPaper || printAnswerKey) return null;
 
     const mcqs = generatedPaper.filter(q => q.type === 'MCQ');
     const saqs = generatedPaper.filter(q => q.type === 'SAQ');
@@ -619,11 +1305,44 @@ export default function OfflineGeneratorPage() {
   // ═══════════════════════════════════════════════════════════════
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8 animate-fade-in-up">
+    <div className="p-8 max-w-7xl mx-auto space-y-8 animate-fade-in-up print:p-0 print:m-0 print:max-w-none print:w-full print:space-y-0">
 
       {/* ─── Print Views (Hidden on screen) ─── */}
       {config.paperType === 'final-exam' && renderFinalExamPrint()}
       {config.paperType === 'professional-mbbs' && renderProfessionalMbbsPrint()}
+      {renderAnswerKeyPrint()}
+
+      {/* ─── Column Mapping Modal ─── */}
+      {renderColumnMappingModal()}
+
+      {/* ─── Restore Draft Prompt ─── */}
+      {showRestorePrompt && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 print:hidden">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 text-center">
+            <div className="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <RotateCcw className="text-blue-600" size={24} />
+            </div>
+            <h3 className="text-lg font-bold text-slate-900 mb-2">Restore Previous Session?</h3>
+            <p className="text-sm text-slate-500 mb-6">
+              You have a saved draft from a previous session. Would you like to restore it?
+            </p>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={discardDraft}
+                className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl text-sm font-medium transition-colors border border-slate-200"
+              >
+                Discard
+              </button>
+              <button
+                onClick={restoreDraft}
+                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold transition-colors shadow-md"
+              >
+                Restore Draft
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─── Screen View (Hidden on print) ─── */}
       <div className="print:hidden space-y-8">
@@ -635,6 +1354,13 @@ export default function OfflineGeneratorPage() {
               <span className="text-emerald-600 ml-2 font-medium">100% offline - no data leaves your browser.</span>
             </p>
           </div>
+          <button
+            onClick={downloadTemplate}
+            className="flex items-center gap-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors border border-emerald-200 shrink-0"
+          >
+            <Download size={16} />
+            Download Template
+          </button>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -851,10 +1577,36 @@ export default function OfflineGeneratorPage() {
                     • <code>Type</code> (Optional: MCQ, SAQ, LAQ. Default: MCQ)<br/>
                     • <code>Option A, B, C, D</code> (Optional, for MCQs)<br/>
                     • <code>Correct Answer</code> (Optional, for MCQs)<br/>
-                    • <code>Marks</code> (Optional)
+                    • <code>Marks</code> (Optional)<br/>
+                    • <code>Difficulty</code> (Optional: Easy, Medium, Hard)<br/>
+                    • <code>Topic</code> (Optional)
                     <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800"></div>
                   </div>
                 </div>
+              </div>
+
+              {/* Selection Mode Toggle */}
+              <div className="flex items-center gap-2 mb-4 bg-slate-100 rounded-lg p-1">
+                <button
+                  onClick={() => setSelectionMode('random')}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-xs font-bold transition-all ${
+                    selectionMode === 'random'
+                      ? 'bg-white text-blue-700 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  <Shuffle size={14} /> Random Pick
+                </button>
+                <button
+                  onClick={() => setSelectionMode('manual')}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-xs font-bold transition-all ${
+                    selectionMode === 'manual'
+                      ? 'bg-white text-blue-700 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  <CheckCircle2 size={14} /> Manual Select
+                </button>
               </div>
 
               <div
@@ -893,11 +1645,66 @@ export default function OfflineGeneratorPage() {
 
               {uploadedBanks.length > 0 && (
                 <div className="space-y-3">
-                  <h3 className="font-bold text-slate-700 mb-2">Configure Extractions:</h3>
+                  <h3 className="font-bold text-slate-700 mb-2">
+                    {selectionMode === 'random' ? 'Configure Extractions:' : 'Select Questions:'}
+                  </h3>
+
+                  {/* Filters (for manual mode) */}
+                  {selectionMode === 'manual' && (
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2 mb-3">
+                      <div className="flex items-center gap-2 text-xs font-bold text-slate-600">
+                        <Filter size={12} /> Filters
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <select
+                          value={filterType}
+                          onChange={(e) => setFilterType(e.target.value)}
+                          className="text-xs bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-slate-700"
+                        >
+                          <option value="all">All Types</option>
+                          <option value="MCQ">MCQ</option>
+                          <option value="SAQ">SAQ</option>
+                          <option value="LAQ">LAQ</option>
+                        </select>
+                        <select
+                          value={filterDifficulty}
+                          onChange={(e) => setFilterDifficulty(e.target.value)}
+                          className="text-xs bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-slate-700"
+                        >
+                          <option value="all">All Difficulty</option>
+                          <option value="Easy">Easy</option>
+                          <option value="Medium">Medium</option>
+                          <option value="Hard">Hard</option>
+                        </select>
+                        <select
+                          value={filterTopic}
+                          onChange={(e) => setFilterTopic(e.target.value)}
+                          className="text-xs bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-slate-700"
+                        >
+                          <option value="all">All Topics</option>
+                          {allTopics.map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                      </div>
+                      <div className="relative">
+                        <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="text"
+                          placeholder="Search questions..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="w-full text-xs bg-white border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 text-slate-700 focus:outline-none focus:border-blue-400"
+                        />
+                      </div>
+                    </div>
+                  )}
+
                   {uploadedBanks.map(bank => {
                     const totalMCQs = bank.questions.filter(q => q.type === 'MCQ').length;
                     const totalSAQs = bank.questions.filter(q => q.type === 'SAQ').length;
                     const totalLAQs = bank.questions.filter(q => q.type === 'LAQ').length;
+                    const isExpanded = expandedBankId === bank.id;
+                    const filteredQuestions = getFilteredQuestions(bank.questions);
+                    const selectedCount = bank.questions.filter(q => q.selected).length;
 
                     return (
                       <div key={bank.id} className="bg-slate-50 border border-slate-200 p-4 rounded-xl relative">
@@ -913,64 +1720,107 @@ export default function OfflineGeneratorPage() {
                           <h4 className="font-bold text-slate-800 text-sm truncate">{bank.filename}</h4>
                         </div>
                         
-                        <div className="space-y-2 mt-3">
-                          {totalMCQs > 0 && (
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-medium text-slate-500 bg-slate-200 px-2 py-1 rounded">
-                                {totalMCQs} MCQs available
-                              </span>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold text-slate-700">Extract:</span>
-                                <input
-                                  type="number"
-                                  min={0}
-                                  max={totalMCQs}
-                                  value={bank.targetMCQ}
-                                  onChange={(e) => updateTargetCount(bank.id, 'MCQ', parseInt(e.target.value) || 0)}
-                                  className="w-16 text-center bg-white border border-slate-300 rounded px-2 py-1 text-sm text-slate-900 focus:outline-none focus:border-blue-500"
-                                />
+                        {selectionMode === 'random' ? (
+                          /* Random mode: extraction controls */
+                          <div className="space-y-2 mt-3">
+                            {totalMCQs > 0 && (
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-medium text-slate-500 bg-slate-200 px-2 py-1 rounded">
+                                  {totalMCQs} MCQs available
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-bold text-slate-700">Extract:</span>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={totalMCQs}
+                                    value={bank.targetMCQ}
+                                    onChange={(e) => updateTargetCount(bank.id, 'MCQ', parseInt(e.target.value) || 0)}
+                                    className="w-16 text-center bg-white border border-slate-300 rounded px-2 py-1 text-sm text-slate-900 focus:outline-none focus:border-blue-500"
+                                  />
+                                </div>
                               </div>
-                            </div>
-                          )}
-                          
-                          {totalSAQs > 0 && (
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-medium text-slate-500 bg-slate-200 px-2 py-1 rounded">
-                                {totalSAQs} SAQs available
-                              </span>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold text-slate-700">Extract:</span>
-                                <input
-                                  type="number"
-                                  min={0}
-                                  max={totalSAQs}
-                                  value={bank.targetSAQ}
-                                  onChange={(e) => updateTargetCount(bank.id, 'SAQ', parseInt(e.target.value) || 0)}
-                                  className="w-16 text-center bg-white border border-slate-300 rounded px-2 py-1 text-sm text-slate-900 focus:outline-none focus:border-blue-500"
-                                />
+                            )}
+                            
+                            {totalSAQs > 0 && (
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-medium text-slate-500 bg-slate-200 px-2 py-1 rounded">
+                                  {totalSAQs} SAQs available
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-bold text-slate-700">Extract:</span>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={totalSAQs}
+                                    value={bank.targetSAQ}
+                                    onChange={(e) => updateTargetCount(bank.id, 'SAQ', parseInt(e.target.value) || 0)}
+                                    className="w-16 text-center bg-white border border-slate-300 rounded px-2 py-1 text-sm text-slate-900 focus:outline-none focus:border-blue-500"
+                                  />
+                                </div>
                               </div>
-                            </div>
-                          )}
+                            )}
 
-                          {totalLAQs > 0 && (
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-medium text-slate-500 bg-slate-200 px-2 py-1 rounded">
-                                {totalLAQs} LAQs available
-                              </span>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold text-slate-700">Extract:</span>
-                                <input
-                                  type="number"
-                                  min={0}
-                                  max={totalLAQs}
-                                  value={bank.targetLAQ}
-                                  onChange={(e) => updateTargetCount(bank.id, 'LAQ', parseInt(e.target.value) || 0)}
-                                  className="w-16 text-center bg-white border border-slate-300 rounded px-2 py-1 text-sm text-slate-900 focus:outline-none focus:border-blue-500"
-                                />
+                            {totalLAQs > 0 && (
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-medium text-slate-500 bg-slate-200 px-2 py-1 rounded">
+                                  {totalLAQs} LAQs available
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-bold text-slate-700">Extract:</span>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={totalLAQs}
+                                    value={bank.targetLAQ}
+                                    onChange={(e) => updateTargetCount(bank.id, 'LAQ', parseInt(e.target.value) || 0)}
+                                    className="w-16 text-center bg-white border border-slate-300 rounded px-2 py-1 text-sm text-slate-900 focus:outline-none focus:border-blue-500"
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          /* Manual mode: question list with checkboxes */
+                          <div className="mt-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-xs text-slate-500 font-medium">{selectedCount}/{bank.questions.length} selected</span>
+                              <div className="flex gap-2">
+                                <button onClick={() => selectAllInBank(bank.id, true)} className="text-xs text-blue-600 hover:underline font-medium">Select All</button>
+                                <button onClick={() => selectAllInBank(bank.id, false)} className="text-xs text-slate-500 hover:underline font-medium">Deselect All</button>
+                                <button
+                                  onClick={() => setExpandedBankId(isExpanded ? null : bank.id)}
+                                  className="text-xs text-slate-500 hover:text-slate-700"
+                                >
+                                  {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                </button>
                               </div>
                             </div>
-                          )}
-                        </div>
+
+                            {isExpanded && (
+                              <div className="max-h-60 overflow-y-auto space-y-1.5 border-t border-slate-200 pt-2">
+                                {filteredQuestions.map(q => (
+                                  <label key={q.id} className={`flex items-start gap-2 p-2 rounded-lg cursor-pointer transition-colors ${q.selected ? 'bg-blue-50 border border-blue-200' : 'hover:bg-slate-100 border border-transparent'}`}>
+                                    <input
+                                      type="checkbox"
+                                      checked={q.selected || false}
+                                      onChange={() => toggleQuestionSelection(bank.id, q.id!)}
+                                      className="mt-0.5 accent-blue-600"
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-xs text-slate-800 line-clamp-2">{q.question}</p>
+                                      <div className="flex gap-1.5 mt-1">
+                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${q.type === 'MCQ' ? 'bg-blue-100 text-blue-700' : q.type === 'SAQ' ? 'bg-amber-100 text-amber-700' : 'bg-purple-100 text-purple-700'}`}>{q.type}</span>
+                                        {q.difficulty && <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${q.difficulty === 'Easy' ? 'bg-emerald-100 text-emerald-700' : q.difficulty === 'Medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>{q.difficulty}</span>}
+                                        {q.topic && <span className="text-[10px] text-slate-500 bg-slate-200 px-1.5 py-0.5 rounded">{q.topic}</span>}
+                                      </div>
+                                    </div>
+                                  </label>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -986,7 +1836,12 @@ export default function OfflineGeneratorPage() {
                 <div className="space-y-4">
                   <div className="bg-blue-50 text-blue-800 p-3 rounded-lg text-sm font-bold flex justify-between items-center border border-blue-100">
                     <span>Total Output Size:</span>
-                    <span className="text-lg">{uploadedBanks.reduce((sum, b) => sum + b.targetMCQ + b.targetSAQ + b.targetLAQ, 0)} Questions</span>
+                    <span className="text-lg">
+                      {selectionMode === 'manual'
+                        ? uploadedBanks.reduce((sum, b) => sum + b.questions.filter(q => q.selected).length, 0)
+                        : uploadedBanks.reduce((sum, b) => sum + b.targetMCQ + b.targetSAQ + b.targetLAQ, 0)
+                      } Questions
+                    </span>
                   </div>
 
                   <div>
@@ -1036,20 +1891,42 @@ export default function OfflineGeneratorPage() {
                 </h2>
 
                 {generatedPaper && (
-                  <div className="flex gap-3">
+                  <div className="flex gap-2 flex-wrap justify-end">
+                    <button
+                      onClick={() => exportToWord(config, generatedPaper, aiimsLogo.src)}
+                      className="bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-2 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 border border-blue-200"
+                    >
+                      <FileText size={14} />
+                      Word (.docx)
+                    </button>
                     <button
                       onClick={handleSecureExport}
-                      className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-4 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2 border border-indigo-200"
+                      className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-2 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 border border-indigo-200"
                     >
-                      <Lock size={16} />
-                      Export Encrypted (.enc)
+                      <Lock size={14} />
+                      Encrypted (.enc)
                     </button>
                     <button
                       onClick={handlePrint}
-                      className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2 border border-slate-300"
+                      className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 border border-slate-300"
                     >
-                      <Printer size={16} />
-                      Save as PDF / Print
+                      <Printer size={14} />
+                      PDF / Print
+                    </button>
+                    <button
+                      onClick={handlePrintAnswerKey}
+                      className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-3 py-2 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 border border-emerald-200"
+                    >
+                      <Key size={14} />
+                      Answer Key
+                    </button>
+                    <button
+                      onClick={randomizeOrder}
+                      className="bg-amber-50 hover:bg-amber-100 text-amber-700 px-3 py-2 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 border border-amber-200"
+                      title="Shuffle the order of all questions randomly"
+                    >
+                      <Shuffle size={14} />
+                      Randomize
                     </button>
                   </div>
                 )}
@@ -1057,59 +1934,112 @@ export default function OfflineGeneratorPage() {
 
               <div className="flex-1 overflow-auto pr-2 custom-scrollbar">
                 {generatedPaper ? (
-                  <div className="space-y-6">
+                  <div className="space-y-4">
                     {/* Format badge */}
-                    <div className="flex items-center gap-2 mb-4">
+                    <div className="flex items-center gap-2 mb-4 flex-wrap">
                       <span className="bg-blue-100 text-blue-700 text-xs font-bold px-3 py-1 rounded-full">
                         {config.paperType === 'final-exam' ? '📋 Final Exam (Test Booklet)' : '🎓 Professional MBBS'}
                       </span>
                       <span className="bg-slate-100 text-slate-600 text-xs font-medium px-3 py-1 rounded-full">
                         {generatedPaper.length} Questions • {config.maxMarks} Marks • {config.timeAllowed}
                       </span>
+                      <span className="bg-amber-100 text-amber-700 text-xs font-medium px-3 py-1 rounded-full flex items-center gap-1">
+                        <Edit3 size={10} /> Click questions to edit • Drag to reorder
+                      </span>
                     </div>
 
                     {generatedPaper.map((q, idx) => (
-                      <div key={idx} className="bg-slate-50 border border-slate-200 rounded-xl p-5 relative">
-                        <div className="absolute top-0 right-0 bg-slate-200 text-slate-600 text-xs font-bold px-2 py-1 rounded-bl-lg rounded-tr-xl">
-                          {q.subject}
+                      <div
+                        key={idx}
+                        className={`bg-slate-50 border rounded-xl p-4 transition-all ${
+                          dragOverIdx === idx ? 'border-blue-400 bg-blue-50 shadow-md' : 'border-slate-200'
+                        } ${dragIdx === idx ? 'opacity-50' : ''}`}
+                        draggable
+                        onDragStart={() => handleDragStart(idx)}
+                        onDragOver={(e) => handleDragOver(e, idx)}
+                        onDrop={() => handleDrop(idx)}
+                        onDragEnd={handleDragEnd}
+                      >
+                        {/* Top row: drag handle, subject badge, marks, swap */}
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500 shrink-0">
+                            <GripVertical size={16} />
+                          </div>
+                          <span className="bg-slate-200 text-slate-600 text-xs font-bold px-2 py-0.5 rounded">
+                            {q.subject}
+                          </span>
+                          {q.difficulty && (
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${q.difficulty === 'Easy' ? 'bg-emerald-100 text-emerald-700' : q.difficulty === 'Medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
+                              {q.difficulty}
+                            </span>
+                          )}
+                          <div className="flex-1" />
+                          <span className="text-sm text-slate-500 font-medium whitespace-nowrap bg-white px-2 py-0.5 rounded border border-slate-200">
+                            {q.marks} Mark{q.marks !== 1 ? 's' : ''}
+                          </span>
+                          <button
+                            onClick={() => swapQuestion(idx)}
+                            className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors shrink-0"
+                            title="Swap with another random question"
+                          >
+                            <ArrowLeftRight size={14} />
+                          </button>
                         </div>
-                        <div className="flex gap-3 text-slate-900 mb-3 mt-2">
-                          <span className="font-bold text-blue-600">Q{idx + 1}.</span>
-                          <div className="flex-1">
-                            <p className="font-bold text-lg pr-4">{q.question}</p>
+
+                        {/* Question content */}
+                        <div className="flex gap-3 text-slate-900 mb-3 ml-6">
+                          <span className="font-bold text-blue-600 shrink-0">Q{idx + 1}.</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-bold text-lg">
+                              <EditableText value={q.question} idx={idx} field="question" />
+                            </div>
                             {q.type !== 'MCQ' && (
                               <span className="inline-block mt-2 text-xs font-medium bg-blue-100 text-blue-800 px-2 py-1 rounded">
                                 {q.type === 'SAQ' ? 'Short Answer' : 'Long Answer'}
                               </span>
                             )}
                           </div>
-                          <span className="ml-auto text-sm text-slate-500 font-medium whitespace-nowrap bg-white px-2 py-1 rounded border border-slate-200 h-fit">
-                            {q.marks} Mark{q.marks !== 1 ? 's' : ''}
-                          </span>
                         </div>
 
                         {q.type === 'MCQ' && (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 ml-7">
-                            {q.optionA && (
-                              <div className={`p-2 rounded border border-slate-200 bg-white ${q.correctAnswer?.toLowerCase() === 'a' ? 'bg-emerald-50 border-emerald-200' : ''}`}>
-                                <span className="text-slate-500 font-bold mr-2">A)</span> <span className="text-slate-700 font-medium">{q.optionA}</span>
-                              </div>
-                            )}
-                            {q.optionB && (
-                              <div className={`p-2 rounded border border-slate-200 bg-white ${q.correctAnswer?.toLowerCase() === 'b' ? 'bg-emerald-50 border-emerald-200' : ''}`}>
-                                <span className="text-slate-500 font-bold mr-2">B)</span> <span className="text-slate-700 font-medium">{q.optionB}</span>
-                              </div>
-                            )}
-                            {q.optionC && (
-                              <div className={`p-2 rounded border border-slate-200 bg-white ${q.correctAnswer?.toLowerCase() === 'c' ? 'bg-emerald-50 border-emerald-200' : ''}`}>
-                                <span className="text-slate-500 font-bold mr-2">C)</span> <span className="text-slate-700 font-medium">{q.optionC}</span>
-                              </div>
-                            )}
-                            {q.optionD && (
-                              <div className={`p-2 rounded border border-slate-200 bg-white ${q.correctAnswer?.toLowerCase() === 'd' ? 'bg-emerald-50 border-emerald-200' : ''}`}>
-                                <span className="text-slate-500 font-bold mr-2">D)</span> <span className="text-slate-700 font-medium">{q.optionD}</span>
-                              </div>
-                            )}
+                          <div className="ml-6">
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className="flex-1" />
+                              <button
+                                onClick={() => shuffleOptionsForQuestion(idx)}
+                                className="flex items-center gap-1 text-xs text-slate-400 hover:text-amber-600 hover:bg-amber-50 px-2 py-1 rounded-lg transition-colors"
+                                title="Shuffle options A/B/C/D for this question"
+                              >
+                                <Shuffle size={12} />
+                                Shuffle Options
+                              </button>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 ml-6">
+                              {q.optionA && (
+                                <div className={`p-2 rounded border border-slate-200 bg-white ${q.correctAnswer?.toLowerCase() === 'a' ? 'bg-emerald-50 border-emerald-200' : ''}`}>
+                                  <span className="text-slate-500 font-bold mr-2">A)</span>
+                                  <EditableText value={q.optionA} idx={idx} field="optionA" className="text-slate-700 font-medium" />
+                                </div>
+                              )}
+                              {q.optionB && (
+                                <div className={`p-2 rounded border border-slate-200 bg-white ${q.correctAnswer?.toLowerCase() === 'b' ? 'bg-emerald-50 border-emerald-200' : ''}`}>
+                                  <span className="text-slate-500 font-bold mr-2">B)</span>
+                                  <EditableText value={q.optionB} idx={idx} field="optionB" className="text-slate-700 font-medium" />
+                                </div>
+                              )}
+                              {q.optionC && (
+                                <div className={`p-2 rounded border border-slate-200 bg-white ${q.correctAnswer?.toLowerCase() === 'c' ? 'bg-emerald-50 border-emerald-200' : ''}`}>
+                                  <span className="text-slate-500 font-bold mr-2">C)</span>
+                                  <EditableText value={q.optionC} idx={idx} field="optionC" className="text-slate-700 font-medium" />
+                                </div>
+                              )}
+                              {q.optionD && (
+                                <div className={`p-2 rounded border border-slate-200 bg-white ${q.correctAnswer?.toLowerCase() === 'd' ? 'bg-emerald-50 border-emerald-200' : ''}`}>
+                                  <span className="text-slate-500 font-bold mr-2">D)</span>
+                                  <EditableText value={q.optionD} idx={idx} field="optionD" className="text-slate-700 font-medium" />
+                                </div>
+                              )}
+                            </div>
                           </div>
                         )}
                       </div>
@@ -1119,7 +2049,12 @@ export default function OfflineGeneratorPage() {
                   <div className="h-full flex flex-col items-center justify-center text-slate-500">
                     <Library size={48} className="mb-4 opacity-50" />
                     <p className="font-medium text-lg">Banks Loaded ({uploadedBanks.reduce((s, b) => s + b.questions.length, 0)} total Qs)</p>
-                    <p className="text-sm mt-2">Adjust quantities on the left and click &apos;Compile Master Paper&apos;</p>
+                    <p className="text-sm mt-2">
+                      {selectionMode === 'random'
+                        ? "Adjust quantities on the left and click 'Compile Master Paper'"
+                        : "Select questions on the left and click 'Compile Master Paper'"
+                      }
+                    </p>
                   </div>
                 ) : (
                   <div className="h-full flex flex-col items-center justify-center text-slate-500">

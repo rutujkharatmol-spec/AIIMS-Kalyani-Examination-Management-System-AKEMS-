@@ -187,6 +187,11 @@ body {
     transition: none !important;
   }
 
+  .animate-fade-in-up, .animate-fade-in {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
   /* 2-column layout for Professional MBBS MCQs */
   .print-two-col {
     column-count: 2;

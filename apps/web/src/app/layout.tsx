@@ -20,7 +20,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${inter.className} relative min-h-screen antialiased`}>
         {/* Background glow effects */}
-        <div className="pointer-events-none fixed inset-0 flex justify-center">
+        <div className="pointer-events-none fixed inset-0 flex justify-center print:hidden">
           <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-blue-100/50 blur-[120px]"></div>
           <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-teal-100/50 blur-[120px]"></div>
         </div>

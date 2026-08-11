@@ -9,14 +9,20 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@akems/shared": "workspace:*",
+    "@xmldom/xmldom": "^0.9.10",
+    "docx": "^8.5.0",
+    "docx-merger": "^1.2.2",
+    "file-saver": "^2.0.5",
+    "lucide-react": "^0.300.0",
     "next": "14.1.0",
+    "pizzip": "^3.2.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "lucide-react": "^0.300.0",
-    "xlsx": "^0.18.5",
-    "@akems/shared": "workspace:*"
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@types/file-saver": "^2.0.7",
     "@types/node": "^20.3.1",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
