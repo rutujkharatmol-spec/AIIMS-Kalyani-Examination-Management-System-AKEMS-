@@ -17,7 +17,7 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchWidgets = async () => {
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? `http://${window.location.hostname}:3001/api/v1` : 'http://localhost:3001/api/v1');
         const response = await fetch(`${apiUrl}/dashboard/widgets`);
         
         if (!response.ok) {

@@ -8,7 +8,7 @@ export function Sidebar() {
   const { isOffline } = useOffline();
 
   return (
-    <aside className="w-64 glass border-r border-slate-200 min-h-screen flex flex-col relative z-20 transition-all duration-300 print:hidden">
+    <aside className="w-64 glass border-r border-slate-200 min-h-screen hidden md:flex flex-col relative z-20 transition-all duration-300 print:hidden">
       <div className="p-6 flex items-center gap-3 border-b border-slate-200">
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-blue-500 flex items-center justify-center shadow-lg shadow-blue-500/20">
           <ShieldCheck className="text-white" size={24} />

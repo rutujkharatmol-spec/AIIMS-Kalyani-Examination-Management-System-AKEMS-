@@ -18,7 +18,7 @@ export default function SeatAllocationPage() {
         return;
       }
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? `http://${window.location.hostname}:3001/api/v1` : 'http://localhost:3001/api/v1');
       
       const res = await fetch(`${apiUrl}/seating/${selectedCycle}`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -49,7 +49,7 @@ export default function SeatAllocationPage() {
     setIsAllocating(true);
     try {
       const token = localStorage.getItem('akems_token');
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? `http://${window.location.hostname}:3001/api/v1` : 'http://localhost:3001/api/v1');
       const res = await fetch(`${apiUrl}/seating/auto-allocate/${selectedCycle}`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }

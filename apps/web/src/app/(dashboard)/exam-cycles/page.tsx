@@ -31,7 +31,7 @@ export default function ExamCyclesPage() {
         return;
       }
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? `http://${window.location.hostname}:3001/api/v1` : 'http://localhost:3001/api/v1');
       
       const res = await fetch(`${apiUrl}/exam-cycles`, {
         headers: {
@@ -65,7 +65,7 @@ export default function ExamCyclesPage() {
     setIsCreating(true);
     try {
       const token = localStorage.getItem('akems_token');
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? `http://${window.location.hostname}:3001/api/v1` : 'http://localhost:3001/api/v1');
       
       const res = await fetch(`${apiUrl}/exam-cycles`, {
         method: 'POST',
@@ -98,7 +98,7 @@ export default function ExamCyclesPage() {
     setOpenDropdownId(null);
     try {
       const token = localStorage.getItem('akems_token');
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? `http://${window.location.hostname}:3001/api/v1` : 'http://localhost:3001/api/v1');
       
       const res = await fetch(`${apiUrl}/exam-cycles/${id}`, {
         method: 'DELETE',
@@ -137,7 +137,7 @@ export default function ExamCyclesPage() {
     setIsCreating(true);
     try {
       const token = localStorage.getItem('akems_token');
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? `http://${window.location.hostname}:3001/api/v1` : 'http://localhost:3001/api/v1');
       
       const res = await fetch(`${apiUrl}/exam-cycles/${editingCycle.id}`, {
         method: 'PATCH',

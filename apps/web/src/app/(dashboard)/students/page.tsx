@@ -40,7 +40,7 @@ export default function StudentsPage() {
         return;
       }
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? `http://${window.location.hostname}:3001/api/v1` : 'http://localhost:3001/api/v1');
       
       const res = await fetch(`${apiUrl}/students`, {
         headers: {
@@ -77,7 +77,7 @@ export default function StudentsPage() {
     setIsAdding(true);
     try {
       const token = localStorage.getItem('akems_token');
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? `http://${window.location.hostname}:3001/api/v1` : 'http://localhost:3001/api/v1');
       
       const payload = {
         ...newStudent,
@@ -122,7 +122,7 @@ export default function StudentsPage() {
     setIsDeletingId(id);
     try {
       const token = localStorage.getItem('akems_token');
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? `http://${window.location.hostname}:3001/api/v1` : 'http://localhost:3001/api/v1');
       
       const res = await fetch(`${apiUrl}/students/${id}`, {
         method: 'DELETE',
@@ -162,7 +162,7 @@ export default function StudentsPage() {
     setIsAdding(true);
     try {
       const token = localStorage.getItem('akems_token');
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? `http://${window.location.hostname}:3001/api/v1` : 'http://localhost:3001/api/v1');
       
       const payload = {
         ...editingStudent,
