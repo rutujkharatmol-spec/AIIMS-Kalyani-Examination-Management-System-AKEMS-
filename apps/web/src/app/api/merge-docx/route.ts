@@ -27,8 +27,12 @@ export async function POST(req: NextRequest) {
     const questionsZip = new PizZip(questionsBuffer);
 
     // Read XML
-    const templateXml = templateZip.file("word/document.xml").asText();
-    const questionsXml = questionsZip.file("word/document.xml").asText();
+    const templateXml = templateZip.file("word/document.xml")?.asText();
+    const questionsXml = questionsZip.file("word/document.xml")?.asText();
+
+    if (!templateXml || !questionsXml) {
+      return NextResponse.json({ error: 'Invalid docx files' }, { status: 400 });
+    }
 
     const parser = new DOMParser();
     const templateDoc = parser.parseFromString(templateXml, "text/xml");
@@ -58,9 +62,9 @@ export async function POST(req: NextRequest) {
 
     // Write back and generate Buffer
     templateZip.file("word/document.xml", newTemplateXml);
-    const mergedBuffer = templateZip.generate({ type: "nodebuffer", compression: "DEFLATE" });
+    const mergedBuffer = templateZip.generate({ type: "uint8array", compression: "DEFLATE" });
 
-    return new NextResponse(mergedBuffer, {
+    return new NextResponse(mergedBuffer as any, {
       status: 200,
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',

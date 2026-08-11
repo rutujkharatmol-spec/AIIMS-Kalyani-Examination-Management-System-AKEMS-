@@ -45,7 +45,7 @@ export default function DutyRosterPage() {
         const bstr = evt.target?.result;
         const wb = XLSX.read(bstr, { type: 'binary' });
         const ws = wb.Sheets[wb.SheetNames[0]];
-        const data = XLSX.utils.sheet_to_json(ws);
+        const data = XLSX.utils.sheet_to_json(ws) as Record<string, any>[];
         
         if (type === 'faculty') {
           if (data.length === 0 || (!('Name' in data[0]) && !('Faculty Name' in data[0]))) throw new Error("Missing 'Name' column.");
