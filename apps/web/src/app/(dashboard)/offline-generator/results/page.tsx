@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { UploadCloud, CheckSquare, AlertCircle, Download, FileSpreadsheet, Trash2, Info } from 'lucide-react';
+import { UploadCloud, CheckSquare, AlertCircle, Download, FileSpreadsheet, Trash2, Info, BarChart2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import Link from 'next/link';
 
@@ -9,6 +9,14 @@ interface UploadedSheet {
   id: string;
   name: string;
   data: any[];
+}
+
+interface ItemAnalysis {
+  question: string;
+  correctCount: number;
+  totalStudents: number;
+  percentage: number;
+  difficulty: 'Easy' | 'Medium' | 'Hard';
 }
 
 interface MergedResult {
@@ -23,8 +31,11 @@ interface MergedResult {
 export default function ResultCompilerPage() {
   const [sheets, setSheets] = useState<UploadedSheet[]>([]);
   const [results, setResults] = useState<MergedResult[] | null>(null);
+  const [itemAnalysis, setItemAnalysis] = useState<ItemAnalysis[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [maxMarks, setMaxMarks] = useState<number>(100);
+  const [activeTab, setActiveTab] = useState<'master' | 'analysis'>('master');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -63,13 +74,28 @@ export default function ResultCompilerPage() {
           throw new Error(`File ${file.name} must have a Roll No column and a Marks column.`);
         }
         
+        // Find Question columns (e.g., Q1, Q.1, Question 1, 1, 1.)
+        const qIndices = headers.reduce((acc, h, idx) => {
+          if (h.match(/^(q|que|question)[\.\s]*\d+$/i) || h.match(/^\d+[\.]?$/)) acc.push(idx);
+          return acc;
+        }, [] as number[]);
+        
         const extractedData = [];
         for (let j = 1; j < jsonData.length; j++) {
           if (!jsonData[j] || !jsonData[j][rollIdx]) continue;
+          
+          const questions: Record<string, number> = {};
+          qIndices.forEach(idx => {
+            const h = String(jsonData[0][idx]).toUpperCase().trim();
+            const val = Number(jsonData[j][idx]);
+            questions[h] = isNaN(val) ? 0 : val;
+          });
+
           extractedData.push({
             rollNo: String(jsonData[j][rollIdx]).trim(),
             name: nameIdx !== -1 ? String(jsonData[j][nameIdx]).trim() : 'Unknown',
-            marks: Number(jsonData[j][marksIdx]) || 0
+            marks: Number(jsonData[j][marksIdx]) || 0,
+            questions
           });
         }
         
@@ -92,6 +118,7 @@ export default function ResultCompilerPage() {
   const removeSheet = (id: string) => {
     setSheets(sheets.filter(s => s.id !== id));
     setResults(null);
+    setItemAnalysis(null);
   };
 
   const compileResults = () => {
@@ -130,8 +157,8 @@ export default function ResultCompilerPage() {
         const mergedArray = Array.from(studentMap.values());
         
         // Calculate totals and status
-        // Assuming pass criteria is 50% in each subject
-        const maxMarksPerSubject = 100; // Hardcoded for demo, could be an input
+        // Using the user-defined maxMarks
+        const maxMarksPerSubject = maxMarks; 
         
         mergedArray.forEach(student => {
           let total = 0;
@@ -153,6 +180,53 @@ export default function ResultCompilerPage() {
         // Sort by Roll No
         mergedArray.sort((a, b) => a.rollNo.localeCompare(b.rollNo));
         setResults(mergedArray);
+
+        // Compile Item Analysis
+        const tempItemAnalysis = new Map<string, { correct: number, total: number }>();
+        sheets.forEach(sheet => {
+          sheet.data.forEach(row => {
+            if (row.questions) {
+              Object.entries(row.questions).forEach(([q, val]) => {
+                if (!tempItemAnalysis.has(q)) {
+                  tempItemAnalysis.set(q, { correct: 0, total: 0 });
+                }
+                const stats = tempItemAnalysis.get(q)!;
+                stats.total += 1;
+                // Treat positive numbers (e.g. 1) as correct for difficulty percentage
+                if ((val as number) > 0) stats.correct += 1; 
+              });
+            }
+          });
+        });
+
+        const analysisArray: ItemAnalysis[] = Array.from(tempItemAnalysis.entries()).map(([q, stats]) => {
+          const percentage = (stats.correct / stats.total) * 100;
+          let difficulty: 'Easy' | 'Medium' | 'Hard' = 'Medium';
+          if (percentage > 80) difficulty = 'Easy';
+          else if (percentage < 30) difficulty = 'Hard';
+          
+          return {
+            question: q,
+            correctCount: stats.correct,
+            totalStudents: stats.total,
+            percentage,
+            difficulty
+          };
+        });
+
+        analysisArray.sort((a, b) => {
+          const aNum = parseInt(a.question.replace(/\D/g, '')) || 0;
+          const bNum = parseInt(b.question.replace(/\D/g, '')) || 0;
+          return aNum - bNum;
+        });
+
+        setItemAnalysis(analysisArray.length > 0 ? analysisArray : null);
+        if (analysisArray.length > 0) {
+          // Keep active tab as master initially
+        } else {
+          setActiveTab('master');
+        }
+
       } catch(err: any) {
         setError("Error compiling results: " + err.message);
       } finally {
@@ -198,11 +272,13 @@ export default function ResultCompilerPage() {
               <h2 className="text-lg font-bold text-slate-900">1. Upload Subject Marks</h2>
               <div className="relative group flex-1">
                 <Info size={16} className="text-slate-400 hover:text-blue-500 cursor-help" />
-                <div className="absolute left-0 bottom-full mb-2 w-64 bg-slate-800 text-white text-xs rounded-lg p-3 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl">
+                <div className="absolute left-0 bottom-full mb-2 w-72 bg-slate-800 text-white text-xs rounded-lg p-3 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl">
                   <strong>Schema Required:</strong><br/>
                   • <code>Roll No</code> (Required)<br/>
                   • <code>Marks / Score</code> (Required)<br/>
-                  • <code>Name</code> (Optional)
+                  • <code>Name</code> (Optional)<br/><br/>
+                  <strong>For Item Analysis (Optional):</strong><br/>
+                  Include columns <code>Q1, Q2, Q3...</code> filled with 1 (Correct) or 0 (Incorrect).
                   <div className="absolute top-full left-4 border-4 border-transparent border-t-slate-800"></div>
                 </div>
               </div>
@@ -240,6 +316,19 @@ export default function ResultCompilerPage() {
               </div>
             )}
 
+            <div className="mb-6">
+              <label className="block text-sm font-bold text-slate-700 mb-2">Max Marks (Per Sheet)</label>
+              <input 
+                type="number" 
+                min="1"
+                value={maxMarks}
+                onChange={(e) => setMaxMarks(Number(e.target.value) || 0)}
+                className="w-full bg-white border border-slate-300 rounded-xl py-3 px-4 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500/50 transition-all shadow-sm"
+                placeholder="e.g. 100"
+              />
+              <p className="text-xs text-slate-500 mt-1">Used to calculate Pass/Fail and total percentage.</p>
+            </div>
+
             {error && (
               <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex gap-3 text-red-400 mb-4">
                 <AlertCircle className="shrink-0" size={20} />
@@ -262,10 +351,38 @@ export default function ResultCompilerPage() {
           </div>
         </div>
 
-        {/* Right Column: Master Sheet Preview */}
-        <div className="lg:col-span-2">
-          <div className="glass p-6 rounded-2xl border border-slate-200 h-full min-h-[500px] flex flex-col">
-            <div className="flex items-center justify-between mb-6">
+        {/* Right Column: Master Sheet Preview & Item Analysis */}
+        <div className="lg:col-span-2 flex flex-col space-y-6">
+          
+          {/* Tabs */}
+          <div className="flex border-b border-slate-200">
+            <button
+              onClick={() => setActiveTab('master')}
+              className={`px-6 py-3 font-bold text-sm transition-colors border-b-2 ${
+                activeTab === 'master'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+              }`}
+            >
+              Master Result Sheet
+            </button>
+            {itemAnalysis && (
+              <button
+                onClick={() => setActiveTab('analysis')}
+                className={`px-6 py-3 font-bold text-sm transition-colors border-b-2 flex items-center gap-2 ${
+                  activeTab === 'analysis'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                }`}
+              >
+                <BarChart2 size={16} />
+                Item Analysis
+              </button>
+            )}
+          </div>
+
+          <div className={`glass p-6 rounded-2xl border border-slate-200 flex flex-col ${activeTab === 'master' ? 'h-[600px]' : 'hidden'}`}>
+            <div className="flex items-center justify-between mb-6 shrink-0">
               <h2 className="text-xl font-bold text-slate-900">Master Result Sheet</h2>
               
               {results && (
@@ -321,6 +438,60 @@ export default function ResultCompilerPage() {
               )}
             </div>
           </div>
+          
+          {/* Item Analysis Section */}
+          {itemAnalysis && (
+            <div className={`glass p-6 rounded-2xl border border-slate-200 flex flex-col animate-fade-in-up h-[600px] ${activeTab === 'analysis' ? '' : 'hidden'}`}>
+              <div className="flex items-center justify-between mb-6 shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                    <BarChart2 size={24} />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-900">Item Analysis (Difficulty Index)</h2>
+                    <p className="text-sm text-slate-500">Percentage of students who answered correctly</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-auto custom-scrollbar">
+                <table className="w-full text-left text-sm text-slate-600">
+                  <thead className="text-xs uppercase bg-slate-100 text-slate-500 sticky top-0 z-10">
+                    <tr>
+                      <th className="px-4 py-3 rounded-tl-lg font-bold">Question</th>
+                      <th className="px-4 py-3 font-bold">Correct / Total</th>
+                      <th className="px-4 py-3 font-bold w-1/3">Success Rate</th>
+                      <th className="px-4 py-3 rounded-tr-lg font-bold">Difficulty</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {itemAnalysis.map((item, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50">
+                        <td className="px-4 py-3 font-bold text-slate-900">{item.question}</td>
+                        <td className="px-4 py-3 font-medium">{item.correctCount} / {item.totalStudents}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <span className="font-bold text-slate-700 w-12">{item.percentage.toFixed(1)}%</span>
+                            <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                              <div 
+                                className={`h-full rounded-full ${item.difficulty === 'Easy' ? 'bg-emerald-500' : item.difficulty === 'Medium' ? 'bg-amber-500' : 'bg-red-500'}`}
+                                style={{ width: `${item.percentage}%` }}
+                              ></div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`px-2 py-1 rounded text-xs font-bold ${item.difficulty === 'Easy' ? 'bg-emerald-100 text-emerald-700' : item.difficulty === 'Medium' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>
+                            {item.difficulty}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

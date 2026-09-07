@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Menu, X, LayoutDashboard, Users, Settings, LogOut, ShieldCheck, CalendarDays, FileSpreadsheet, Grid2X2, GraduationCap } from 'lucide-react';
+import { Menu, X, LayoutDashboard, Users, Settings, LogOut, ShieldCheck, CalendarDays, FileSpreadsheet, Grid2X2, GraduationCap, BarChart3, ClipboardCheck } from 'lucide-react';
 import { useOffline } from '../../context/OfflineContext';
 
 export function MobileNav() {
@@ -70,16 +70,34 @@ export function MobileNav() {
                 <Grid2X2 size={20} />
                 Seat Allocation
               </Link>
+              <Link onClick={() => setIsOpen(false)} href="/offline-generator/nmc-reports" className="flex items-center gap-3 p-3 rounded-xl text-slate-600 hover:bg-blue-50 dark:hover:bg-slate-800 hover:text-blue-700 transition-all">
+                <BarChart3 size={20} className="text-rose-600" />
+                Item Analysis
+              </Link>
+              <Link onClick={() => setIsOpen(false)} href="/offline-generator/results" className="flex items-center gap-3 p-3 rounded-xl text-slate-600 hover:bg-blue-50 dark:hover:bg-slate-800 hover:text-blue-700 transition-all">
+                <ClipboardCheck size={20} className="text-amber-600" />
+                Master Result
+              </Link>
               <Link onClick={() => setIsOpen(false)} href="/dashboard/settings" className="flex items-center gap-3 p-3 rounded-xl text-slate-600 hover:bg-blue-50 dark:hover:bg-slate-800 hover:text-blue-700 transition-all">
                 <Settings size={20} />
                 Settings
               </Link>
             </>
           ) : (
-            <Link onClick={() => setIsOpen(false)} href="/offline-generator" className="flex items-center gap-3 p-3 rounded-xl bg-slate-100 text-slate-800 font-medium border border-slate-200">
-              <FileSpreadsheet size={20} className="text-emerald-600" />
-              Offline Tools
-            </Link>
+            <>
+              <Link onClick={() => setIsOpen(false)} href="/offline-generator" className="flex items-center gap-3 p-3 rounded-xl bg-slate-100 text-slate-800 font-medium border border-slate-200">
+                <FileSpreadsheet size={20} className="text-emerald-600" />
+                Offline Tools
+              </Link>
+              <Link onClick={() => setIsOpen(false)} href="/offline-generator/nmc-reports" className="flex items-center gap-3 p-3 rounded-xl text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 transition-all ml-4">
+                <BarChart3 size={18} className="text-rose-600" />
+                Item Analysis
+              </Link>
+              <Link onClick={() => setIsOpen(false)} href="/offline-generator/results" className="flex items-center gap-3 p-3 rounded-xl text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 transition-all ml-4">
+                <ClipboardCheck size={18} className="text-amber-600" />
+                Master Result
+              </Link>
+            </>
           )}
         </nav>
 

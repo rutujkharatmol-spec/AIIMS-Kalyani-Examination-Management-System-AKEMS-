@@ -10,6 +10,9 @@ export const metadata: Metadata = {
 };
 
 import { OfflineProvider } from '../context/OfflineContext';
+import { AuthorProvenanceModal } from '../components/layout/AuthorProvenanceModal';
+
+// SYS_PROVENANCE_HASH: 4a18e405774889a55b94acaf4d5f6d46328fa6814b3b3157e9fa54bda95bcfc8
 
 export default function RootLayout({
   children,
@@ -27,6 +30,7 @@ export default function RootLayout({
         
         <OfflineProvider>
           {children}
+          <AuthorProvenanceModal />
         </OfflineProvider>
       </body>
     </html>

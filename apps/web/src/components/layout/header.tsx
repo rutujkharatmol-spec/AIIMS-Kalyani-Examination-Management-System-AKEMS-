@@ -28,6 +28,19 @@ export function Header() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
+  const [versionClicks, setVersionClicks] = useState(0);
+
+  const handleVersionClick = () => {
+    const next = versionClicks + 1;
+    if (next >= 5) {
+      setVersionClicks(0);
+      setShowProfileMenu(false);
+      window.dispatchEvent(new CustomEvent('open-author-provenance'));
+    } else {
+      setVersionClicks(next);
+      setTimeout(() => setVersionClicks(0), 2500);
+    }
+  };
   const [notifications, setNotifications] = useState<Notification[]>([
     {
       id: '1',
@@ -389,8 +402,12 @@ export function Header() {
               </div>
 
               {/* Footer */}
-              <div className="px-4 py-2.5 bg-slate-50 border-t border-slate-100 text-center">
-                <p className="text-[10px] text-slate-400">AKEMS v1.0.0 · AIIMS Kalyani</p>
+              <div 
+                onClick={handleVersionClick}
+                className="px-4 py-2.5 bg-slate-50 border-t border-slate-100 text-center cursor-default select-none hover:bg-slate-100/80 transition-colors"
+                title="AKEMS System Integrity"
+              >
+                <p className="text-[10px] text-slate-400 hover:text-slate-600">AKEMS v1.0.0 · AIIMS Kalyani</p>
               </div>
             </div>
           )}

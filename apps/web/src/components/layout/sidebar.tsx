@@ -1,11 +1,24 @@
 'use client';
 
 import Link from 'next/link';
-import { LayoutDashboard, Users, Settings, LogOut, ShieldCheck, CalendarDays, FileSpreadsheet, Grid2X2, GraduationCap } from 'lucide-react';
+import { useState } from 'react';
+import { LayoutDashboard, Users, Settings, LogOut, ShieldCheck, CalendarDays, FileSpreadsheet, Grid2X2, GraduationCap, BarChart3, ClipboardCheck } from 'lucide-react';
 import { useOffline } from '../../context/OfflineContext';
 
 export function Sidebar() {
   const { isOffline } = useOffline();
+  const [clickCount, setClickCount] = useState(0);
+
+  const handleVersionClick = () => {
+    const next = clickCount + 1;
+    if (next >= 5) {
+      setClickCount(0);
+      window.dispatchEvent(new CustomEvent('open-author-provenance'));
+    } else {
+      setClickCount(next);
+      setTimeout(() => setClickCount(0), 2500);
+    }
+  };
 
   return (
     <aside className="w-64 glass border-r border-slate-200 min-h-screen hidden md:flex flex-col relative z-20 transition-all duration-300 print:hidden">
@@ -39,16 +52,34 @@ export function Sidebar() {
               <Grid2X2 size={20} />
               Seat Allocation
             </Link>
+            <Link href="/offline-generator/nmc-reports" className="flex items-center gap-3 p-3 rounded-xl text-slate-600 hover:bg-blue-50 hover:text-blue-700 transition-all duration-300">
+              <BarChart3 size={20} className="text-rose-600" />
+              Item Analysis
+            </Link>
+            <Link href="/offline-generator/results" className="flex items-center gap-3 p-3 rounded-xl text-slate-600 hover:bg-blue-50 hover:text-blue-700 transition-all duration-300">
+              <ClipboardCheck size={20} className="text-amber-600" />
+              Master Result
+            </Link>
             <Link href="/dashboard/settings" className="flex items-center gap-3 p-3 rounded-xl text-slate-600 hover:bg-blue-50 hover:text-blue-700 transition-all duration-300">
               <Settings size={20} />
               Settings
             </Link>
           </>
         ) : (
-          <Link href="/offline-generator" className="flex items-center gap-3 p-3 rounded-xl bg-slate-100 text-slate-800 font-medium border border-slate-200 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md hover:shadow-emerald-500/20">
-            <FileSpreadsheet size={20} className="text-emerald-600" />
-            Offline Tools
-          </Link>
+          <>
+            <Link href="/offline-generator" className="flex items-center gap-3 p-3 rounded-xl bg-slate-100 text-slate-800 font-medium border border-slate-200 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md hover:shadow-emerald-500/20">
+              <FileSpreadsheet size={20} className="text-emerald-600" />
+              Offline Tools
+            </Link>
+            <Link href="/offline-generator/nmc-reports" className="flex items-center gap-3 p-3 rounded-xl text-slate-600 hover:bg-slate-100 hover:text-slate-800 transition-all duration-300 ml-4">
+              <BarChart3 size={18} className="text-rose-600" />
+              Item Analysis
+            </Link>
+            <Link href="/offline-generator/results" className="flex items-center gap-3 p-3 rounded-xl text-slate-600 hover:bg-slate-100 hover:text-slate-800 transition-all duration-300 ml-4">
+              <ClipboardCheck size={18} className="text-amber-600" />
+              Master Result
+            </Link>
+          </>
         )}
       </nav>
       
@@ -57,7 +88,11 @@ export function Sidebar() {
           <LogOut size={20} />
           <span>Sign Out</span>
         </button>
-        <div className="text-xs text-slate-500 text-center mt-4">
+        <div 
+          onClick={handleVersionClick}
+          className="text-xs text-slate-500 text-center mt-4 cursor-default select-none hover:text-slate-600 transition-colors"
+          title="AKEMS System Integrity"
+        >
           Dean View &bull; v1.0.0
         </div>
       </div>

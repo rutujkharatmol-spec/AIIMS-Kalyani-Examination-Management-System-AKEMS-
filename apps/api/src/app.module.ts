@@ -27,6 +27,7 @@ import { ReEvaluationModule } from './modules/re-evaluation/re-evaluation.module
 import { ResultsModule } from './modules/results/results.module';
 import { MarksheetModule } from './modules/marksheet/marksheet.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { HealthController } from './health.controller';
 
 @Module({
   imports: [
@@ -74,7 +75,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
     MarksheetModule,
     AnalyticsModule
   ],
-  controllers: [],
+  controllers: [HealthController],
   providers: [],
 })
 export class AppModule {}
